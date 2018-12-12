@@ -1,0 +1,9 @@
+{
+	"description": "Earth v1.0",
+	"name": "earth",
+	"author": "Tean UnCodr",
+	"homepage": "https://uncodr.com",
+	"license": "MIT",
+    "partials": {"headers": ["partials/header"], "posts": ["partials/home-posts"]},
+    "partialsActive": {"header": "partials/header", "homepage": "partials/home-posts", "blog": "partials/home-posts", "single": "partials/home-posts"}
+}

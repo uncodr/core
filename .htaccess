@@ -1,0 +1,9 @@
+RewriteEngine on
+
+RewriteCond %{REQUEST_URI}::$1 ^(.*?/)(.*)::\2$
+RewriteRule ^(.*)$ - [E=BASE:%1]
+RewriteCond $1 !^(index\.php|robots\.txt|favicon\.ico|sitemap\.xml)
+RewriteRule ^(.*)$ %{ENV:BASE}index.php/$1 [L,QSA]
+
+# SetEnv CI_ENV 'production'
+SetEnv CI_ENV 'development'

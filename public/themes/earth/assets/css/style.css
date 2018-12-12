@@ -1,0 +1,32 @@
+@charset "utf-8";
+/* CSS Document */
+
+body.page { font-size: 1.6rem; }
+body.home .hidden-home { display: none; }
+
+body.page .app-title { float: left; font-size: 2rem; }
+body.page .topbar a { color: inherit; }
+body.page .topbar .nav-primary > li:first-child { padding-left: 0; }
+body.page .topbar .nav-primary > li:last-child { padding-right: 0; }
+body.page .topbar .nav-primary a { margin-left: 0; margin-right: 0; padding-left: 0.2rem; padding-right: 0.2rem; }
+body.page .topbar .nav-primary a:hover { background-color: transparent; }
+body.page .topbar .nav-primary a::after { content: ""; position: absolute; bottom: 0; left: 50%; right: 50%; width: 0; height: 0.2rem; background-color: #263238; border-radius: 0.2rem; transition: all 200ms; }
+body.page .topbar .nav-primary a:hover::after, body.page .topbar .nav-primary .active a::after { left: 0; right: 0; width: 100%; }
+body.page .topbar .nav-primary > li.separate::before { background-color: rgba(38,50,56,0.12); }
+
+body.page .article.featured { color: #fff; background-color: #263238; }
+body.page .article.hilite { background-color: #fff; border-top: 0.1rem solid rgba(0,0,0,0.06); border-bottom: 0.1rem solid rgba(0,0,0,0.06); }
+body.page .article > header { position: relative; padding-top: 6rem; padding-bottom: 6rem; color: #fff; background: transparent none no-repeat center center /cover; }
+body.page .article > header::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; right: 0; z-index: 0; background-color: rgba(0,0,0,0.52); }
+body.page .article > header .title { margin-bottom: 0; }
+body.page .article > .body { padding-top: 6rem; padding-bottom: 6rem; }
+body.page .article > .body > .wrapper > *:last-child { margin-bottom: 0; }
+
+body.home .app-title { font-size: 3rem; }
+body.home .article ~ .article > header { padding-bottom: 0; color: inherit; }
+body.home .article ~ .article > header::before { display: none; }
+body.home .article ~ .article > .body { padding-top: 3rem; }
+body.home .topbar { position: absolute; left: 0; right: 0; top: 1rem; z-index: 1; background-color: transparent; color: #fff; box-shadow: none; }
+body.home .topbar .nav-primary a::after { background-color: #fff; }
+body.home .topbar .nav-primary > li.separate::before { background-color: rgba(255,255,255,0.12); }
+body.home .topbar + .article > header { padding-top: 24rem; padding-bottom: 24rem; text-align: center; color: #fff; text-shadow: 0 0 0.2rem rgba(0,0,0,0.27); }
