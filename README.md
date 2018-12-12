@@ -1,5 +1,5 @@
 # UnCodr Core
-UnCodr is one Framework to rule them all. It aims to provide everyone, and we mean EVERYONE, an ability to build mobile and web apps without writing a single line of code. Currently the CMS is under development, and afterwards we plan to complete the app builder.
+UnCodr is one Framework to rule them all. It aims to provide everyone an ability to build mobile and web apps without writing a single line of code. Currently the CMS is under development, and afterwards we plan to complete the app builder.
 
 ## Timelines
 ### Phase 1
