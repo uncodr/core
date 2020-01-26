@@ -26,6 +26,25 @@ function apiGetOrderBy($sort = [], $table = '', $alias = []) {
 	return $orderBy;
 }
 
+function apiWhereByType($param, $data, $orderByField = false) {
+
+	if(!isset($param['where'])) { $param['where'] = []; }
+	if(!isset($param['where_in'])) { $param['where_in'] = []; }
+
+	foreach ($data as $key => $value) {
+		switch(gettype($value)) {
+			case 'array':
+				$param['where_in'][$key] = $value;
+				if($orderByField) { $param['order_by_field'] = [$key => $value]; }
+				break;
+			case 'string': case 'integer':
+				$param['where'][$key] = $value;
+				break;
+		}
+	}
+	return $param;
+}
+
 function apiGetOffset($param, $limit = 20) {
 
 	$out = [(int) $limit, 0];

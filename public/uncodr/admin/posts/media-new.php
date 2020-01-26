@@ -24,6 +24,7 @@
 				</label>
 			</div>
 			<div class="col sm-4 s-6">
+				<p>Image URL:<br><span class="upload-path bold"></span></p>
 				<label>
 					<span class="field-name">Title</span>
 					<input type="text" name="title" value="" class="big full" required>

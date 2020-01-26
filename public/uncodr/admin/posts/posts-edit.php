@@ -27,7 +27,6 @@
 					<span class="field-name">Title</span>
 					<input type="text" name="title" value="" class="big full" required>
 				</label>
-
 				<textarea name="content" class="wysiwyg full"></textarea>
 				<input type="hidden" name="template" value="">
 				<input type="hidden" name="excerpt" value="">
@@ -37,7 +36,8 @@
 				<div class="row">
 					<div class="col xs-12 s-6 sm-12">
 						<p class="label">Featured Image <a href="#" class="pull-right">Edit</a></p>
-						<div class="img-placeholder dropzone"></div>
+						<div class="dropzone"></div>
+						<input type="hidden" name="meta[thumbnail]" value="" data-method="put">
 					</div>
 					<div class="col xs-12 s-6 sm-12 post-status">
 						<p class="label"><?= substr($heading, 0, -1); ?> Settings<a class="settings-link pull-right">Edit</a></p>
@@ -45,8 +45,9 @@
 							<div class="body summary">
 								<ul class="list-icons no-margin">
 									<li><i class="ion ion-paper-airplane"></i>Status: <strong class="post_status">Draft</strong></li>
-									<li><i class="ion ion-eye"></i>Visibility: <strong class="post_password">Public</strong></li>
 <?php if($subPage == 'article') { ?>
+									<li><i class="ion ion-eye"></i>Visibility: <strong class="post_password">Public</strong></li>
+<?php } if($subPage != 'page') { ?>
 									<li><i class="ion ion-chatboxes"></i>Comments: <strong class="post_commentStatus">Disabled</strong></li>
 <?php } ?>
 								</ul>
@@ -63,6 +64,7 @@
 										</select><span></span>
 									</span>
 								</div>
+<?php if($subPage == 'article') { ?>
 								<div>
 									<label><span class="radio"><input name="password" type="radio" value="" checked="checked" data-saved="true"><span></span></span>Public</label>
 									<label><span class="radio"><input name="password" type="radio" value="SYSTEM"><span></span></span>Private</label>
@@ -71,13 +73,16 @@
 										<div><input type="text" class="custom-password hidden" placeholder="Select Password"></div>
 									</label>
 								</div>
-								<label class="comment-status<?= ($subPage == 'page')? ' hidden':''; ?>"><span class="checkbox"><input name="commentStatus" type="checkbox" value="1"><span></span></span>Enable Comments</label>
+<?php } if($subPage != 'page') { ?>
+								<label class="comment-status"><span class="checkbox"><input name="commentStatus" type="checkbox" value="1"><span></span></span>Enable Comments</label>
+<?php } ?>
 							</div>
 						</div>
 					</div>
 				</div>
 			</div>
 		</div>
+		<div class="tag-search"></div>
 <?php /*
 		<p class="hint no-margin"><span class="pwd-0">Public: Visible to anyone who has the link. </span><span class="pwd-SYSTEM">Private: Visible to anyone who is a user of your website. </span><span class="pwd-custom">Protected: Visible to anyone who knows the password you select.</span></p>
 		<p>

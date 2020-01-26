@@ -12,7 +12,7 @@ class Cms {
 	 * get posts and meta data
 	 * @param  int $postID
 	 * @param  array  $param  keys: search, meta, sort, page/start, author (screenName), status (published/drafts/trash), fields
-	 * @return [type]         [description]
+	 * @return [type]		 [description]
 	 */
 	public function get($postID = null, $param = []) {
 
@@ -23,6 +23,7 @@ class Cms {
 			'order_by' => ['posts.lastUpdatedOn' => 'DESC'],
 			'limit' => apiGetOffset($param)
 		];
+		$isSingle = 0;
 
 		# if postID is sent, then check whether child posts to be fetched
 		if($postID) {
@@ -31,47 +32,48 @@ class Cms {
 				$param2['order_by'] = ['posts.parentID' => 'ASC'];
 			} else {
 				$param2['where'] = ['postID' => $postID];
+				$isSingle = 1;
 			}
 		}
 
-		# use author, status, type, search and sort values from $param array
+		# else if slug is sent
 		elseif(isset($param['slug'])) {
 			$param2['where']['slug'] = $param['slug'];
+			$isSingle = 1;
 		}
 
-		# use sort, author, status, type, and search values from $param array
+		# use sort, author, type, and search values from $param array
 		else {
 
 			if(isset($param['sort'])) { $param2['order_by'] = apiGetOrderBy($param['sort'], 'posts', ['id' => 'postID']); }
 
 			$param2['where'] = [];
 			if(isset($param['author'])) { $param2['where']['users.screenName'] = $param['author']; }
-			if(isset($param['status'])) {
-				switch($param['status']) {
-					case 'published':
-						$param2['where']['posts.publishedOn !='] = null;
-						break;
-					case 'drafts':
-						$param2['where']['posts.status !='] = 0;
-						$param2['where']['posts.publishedOn'] = null;
-						break;
-					case 'trash':
-						$param2['where']['posts.status'] = 0;
-						break;
-				}
-			}
-			if(isset($param['type'])) {
-				$param2['where']['posts.type'] = $param['type'];
-			}
-			if(isset($param['search'])) {
+			if(isset($param['type'])) { $param2['where']['posts.type'] = $param['type']; }
+			if(isset($param['search']) && $param['search']) {
 				$param2['groupClause'] = [
 					'or_like' => ['title' => $param['search'], 'content' => $param['search']]
 				];
 			}
 		}
 
+		if(isset($param['status'])) {
+			switch($param['status']) {
+				case 'published':
+					$param2['where']['posts.publishedOn !='] = null;
+					break;
+				case 'drafts':
+					$param2['where']['posts.status !='] = 0;
+					$param2['where']['posts.publishedOn'] = null;
+					break;
+				case 'trash':
+					$param2['where']['posts.status'] = 0;
+					break;
+			}
+		}
+
 		# if 'select' has fields from users table, then use join
-		if(isset($param['fields'])) { $param2['select'] = $this->_sanitizePostFields($param['fields']); }
+		if(isset($param['fields'])) { $param2['select'] = $this->_sanitizePostFields($param['fields'], $isSingle); }
 		if(strpos($param2['select'], 'users.') !== false) { $param2['join'] = ['users' => 'posts.authorID = users.userID']; }
 
 		# fetch data, return null if not found
@@ -82,8 +84,10 @@ class Cms {
 		if(isset($param['meta'])) {
 
 			# fetch user's meta data and permission
-			if($postID) {
-				$posts = $this->getMeta($posts, $param['meta']);
+			if($isSingle !== 0) {
+				if(!$postID) { $postID = isset($posts[0]['postID'])? $posts[0]['postID'] : $posts[0]['id']; }
+				if($isSingle !== 1) { unset($posts[0]['postID']); }
+				$posts[0]['meta'] = $this->getMeta($postID, $param['meta']);
 			}
 
 			# fetch page size and users' count
@@ -91,7 +95,9 @@ class Cms {
 				$meta = ['pageSize' => $param2['limit'][0]];
 
 				$param['meta'] = array_flip($param['meta']);
-				if(isset($param['meta']['count'])) { $meta['count'] = $this->_countPosts($param2); }
+				if(isset($param['meta']['count'])) {
+					$meta['count'] = $this->_countPosts($param2, !isset($param['restrictCount']));
+				}
 				if(isset($param['meta']['post'])) {
 					$posts = $this->getMeta($posts, true);
 				}
@@ -102,12 +108,13 @@ class Cms {
 		return compact('posts');
 	}
 
-	private function _sanitizePostFields($select = null) {
+	private function _sanitizePostFields($select = null, &$isSingle) {
 
 		$select = explode(',', $select);
 		$select = array_flip($select);
+		$hasID = false;
 
-		if(isset($select['id'])) { $select['postID as id'] = $select['id']; }
+		if(isset($select['id'])) { $select['postID as id'] = $select['id']; $hasID = true; }
 		if(isset($select['parent'])) { $select['parentID as parent'] = $select['parent']; }
 		if(isset($select['password'])) { $select['posts.password'] = $select['password']; }
 		if(isset($select['status'])) { $select['posts.status'] = $select['status']; }
@@ -117,11 +124,16 @@ class Cms {
 		unset($select['id'], $select['parent'], $select['password'], $select['status'], $select['lastUpdatedOn'], $select['author'], $select['authorName']);
 
 		asort($select);
+		if($isSingle && !$hasID && !isset($select['postID'])) {
+			$select['postID'] = count($select);
+			$isSingle = -1;
+		}
+
 		$select = array_flip($select);
 		return implode(',', $select);
 	}
 
-	private function _countPosts($param = []) {
+	private function _countPosts($param = [], $getAll = true) {
 
 		$output = [
 			'all' => 0,
@@ -131,7 +143,8 @@ class Cms {
 		];
 		$param['select'] = 'posts.status, count(`'.$this->CI->db->dbprefix.'posts`.`status`) as count';
 		$param['group_by'] = 'posts.status';
-		unset($param['order_by'], $param['limit']);
+		unset($param['order_by'], $param['limit'], $param['where']['posts.status'], $param['where']['posts.status !=']);
+		if($getAll) { unset($param['where']['posts.publishedOn'], $param['where']['posts.publishedOn !=']); }
 
 		if(!isset($param['where']['users.screenName'])) { unset($param['join']); }
 
@@ -149,34 +162,15 @@ class Cms {
 		return $output;
 	}
 
-	public function getMeta($post, $keys = null) {
+	public function getMeta($postIDs, $keys = null) {
 
-		if(gettype($post) == 'array') {
-			foreach($post as $i => $p) {
-				$post[$i]['meta'] = $this->getMeta($p['id'], $keys);
+		if(gettype($postIDs) == 'array') {
+			foreach($postIDs as $i => $p) {
+				$postIDs[$i]['meta'] = $this->CI->model->getMeta('posts', ['where' => ['postID' => $p['id'], 'key' => $keys]]);
 			}
-			return $post;
+			return $postIDs;
 		}
-		else { return $this->_getMeta($post, $keys); }
-	}
-
-	private function _getMeta($postID, $keys) {
-
-		# prepare query parameters
-		$param = ['table' => 'posts_meta', 'select' => 'key, value', 'where' => ['postID' => $postID]];
-
-		# if $keys is array, use 'where_in', if string or integer, use 'where'
-		switch(gettype($keys)) {
-			case 'array':
-				$param['where_in'] = ['key' => $keys];
-				break;
-			case 'string': case 'integer':
-				$param['where']['key'] = $keys;
-				break;
-		}
-
-		$data = $this->CI->model->get($param);
-		return array_column($data, 'value', 'key');
+		else { return $this->CI->model->getMeta('posts', ['where' => ['postID' => $postIDs, 'key' => $keys]]); }
 	}
 
 	/**
@@ -188,7 +182,7 @@ class Cms {
 		# default values
 		# post data has: slug, type, title, content, template, excerpt, password, parent, commentStatus
 		$time = time();
-		$post['parentID'] = (int) $post['parent'];
+		$post['parentID'] = ($post['parent'])? (int) $post['parent'] : null;
 		$post['authorID'] = $authorID;
 		$post['publishedOn'] = ($post['status'] == '3')? $time : null;
 		$post['addedOn'] = $time;
@@ -207,29 +201,204 @@ class Cms {
 	 * update post
 	 * @return	int 		number of affected rows
 	 */
-	public function patch($postID = null, $post = []) {
+	public function patch($postID = null, $data = [], $isSync = false) {
 
-		if(!$postID && !$post['id']) { return null; }
+		if(!$postID && !$data['id']) { return null; }
 
-		# default keys in $post: slug, type, title, content, template, excerpt, password, parent, commentStatus
-		$time = time();
-		$post['parentID'] = (int) $post['parent'];
-		$post['publishedOn'] = ($post['status'] == '3')? $time : null;
-		$post['lastUpdatedOn'] = $time;
-		unset($post['parent']);
+		# default keys in $data: slug, type, title, content, template, excerpt, password, parent, commentStatus
+		if(isset($data['parent'])) {
+			$data['parentID'] = ($data['parent'])? (int) $data['parent'] : null;
+		}
+		unset($data['parent']);
+
+		# if only updating the commentCount, then this parameter is true, so publishedOn does not change
+		if(!$isSync) {
+			$time = time();
+			$data['publishedOn'] = ($data['status'] == '3')? $time : null;
+			$data['lastUpdatedOn'] = $time;
+		}
 
 		# prepare parameters array
 		$param = ['where' => ['postID' => $postID]];
 		if(!$postID) {
-			$param = ['where_in' => ['postID' => explode('-', $post['id'])]];
-			unset($post['id']);
+			$param = ['where_in' => ['postID' => explode('-', $data['id'])]];
+			unset($data['id']);
 		}
 		$param['table'] = 'posts';
-		$param['data'] = $post;
+		$param['data'] = $data;
 
 		# update post data
 		$affRows = $this->CI->model->update($param, false);
 		return ($affRows)? ['count' => $affRows] : null;
+	}
+
+	public function getComments($postID = null, $getPublished = true) {
+
+		if(!$postID) { return null; }
+
+		# NOTE: code within multiline comments (/**/) is for recursive selection of
+		# comments. This code outputs an array with parent comments on zeroth offset
+		# and children on remaining offsets with parent comment's ID as the key.
+		$param = [
+			'table' => 'comments',
+			'select' => 'commentID as id, authorName as name, authorEmail as email, content, postID, parentID as parent, lastUpdatedOn',
+			'where' => [/*'parentID' => null*/],
+			'where_in' => [],
+			'order_by' => ['lastUpdatedOn' =>  'DESC']
+		];
+		if($getPublished) { $param['where']['status'] = 3; }
+		else { $param['select'] .= ', status'; }
+
+		$param = apiWhereByType($param, ['postID' => $postID]);
+
+		$output = $this->CI->model->get($param);
+
+		# zeroth offset is an array of all comments on given postID
+		/*return (count($output))? $this->_getCommentsRecursively(array_column($output, 'id'), [$output], $param) : null;*/
+		return (count($output))? $output : null;
+	}
+
+	private function _getCommentsRecursively($parentIDs, $output, $param) {
+
+		# get comments using $parentIDs in 'where_in' condition
+		if(!count($parentIDs)) { return []; }
+		$param['where_in'] = ['parentID' => $parentIDs];
+		$data = $this->CI->model->get($param);
+		if(count($data)) {
+
+			# commentIDs is an array to store the commentID for recursive lookup
+			$commentIDs = [];
+			foreach ($data as $key => $value) {
+				$commentIDs[] = (int) $value['id'];
+
+				# push the current record (i.e. $value) at 'parentID' offset of output
+				$parentID = (int) $value['parent'];
+				unset($value['parent']);
+				if(!isset($output[$parentID])) { $output[$parentID] = []; }
+				$output[$parentID][] = $value;
+			}
+
+			# recursive lookup
+			$commentIDs = array_unique($commentIDs);
+			if (count($commentIDs)) {
+				$output = $this->_getCommentsRecursively($commentIDs, $output);
+			}
+		}
+
+		return $output;
+	}
+
+	public function putComment($data = [], $author = []) {
+
+		# default keys in data: content, parent, postID, status
+		if(!isset($data['content']) || !isset($data['postID']) || !isset($data['status'])) { return null; }
+
+		# get original post
+		$post = $this->get($data['postID'], ['fields' => 'commentStatus,commentCount']);
+		$post = $post['posts'];
+		if(!isset($post[0]) || !$post[0]['commentStatus']) { return null; }
+
+		$time = time();
+		$data['parentID'] = ($data['parent'])? (int) $data['parent'] : null;
+		$data['authorName'] = $author['name'];
+		$data['authorEmail'] = $author['email'];
+		$data['addedOn'] = $time;
+		$data['lastUpdatedOn'] = $time;
+		unset($data['parent']);
+
+		# create comment and get commentID
+		$commentID = $this->CI->model->insert([
+			'table' => 'comments',
+			'data' => $data
+		]);
+
+		if($commentID) {
+
+			# update post's commentCount if comment is published
+			if($data['status'] == '3') {
+				$post[0]['commentCount'] = (int) $post[0]['commentCount'];
+				$this->patch($data['postID'], ['commentCount' => $post[0]['commentCount']+1], true);
+			}
+
+			return ['id' => $commentID];
+		} else { return null; }
+	}
+
+	public function patchComment($commentID = null, $data = []) {
+
+		if(!$commentID && !$data['id']) { return null; }
+
+		# get original post
+		if(isset($data['validate'])) {
+			$post = $this->get($data['postID'], ['fields' => 'commentStatus,commentCount']);
+			$post = $post['posts'];
+			if(!isset($post[0]) || !$post[0]['commentStatus']) { return null; }
+			unset($data['validate'], $data['postID']);
+		}
+
+		if(isset($data['parent'])) {
+			$data['parentID'] = ($data['parent'])? (int) $data['parent'] : null;
+		}
+		unset($data['parent']);
+
+		$data['lastUpdatedOn'] = time();
+
+		# prepare parameters array
+		$param = ['where' => ['commentID' => $commentID]];
+		if(!$commentID) {
+			$commentID = explode('-', $data['id']);
+			$param = ['where_in' => ['commentID' => $commentID]];
+			unset($data['id']);
+		}
+		$param['table'] = 'comments';
+		$param['data'] = $data;
+
+		# update comments
+		$affRows = $this->CI->model->update($param, false);
+		if($affRows) {
+
+			# update commentCount for the given postID
+			if(isset($data['status'])) {
+				if(isset($param['where'])) {
+					$this->updateCommentCount($data['postID']);
+				} else {
+					$data['postID'] = array_unique(explode('-', $data['postID']));
+					foreach($data['postID'] as $i => $val) {
+						$this->updateCommentCount($val);
+					}
+				}
+			}
+			return ['count' => $affRows];
+		} else { return null; }
+	}
+
+	public function getCommentCount($postID = null) {
+
+		if(!$postID) { return null; }
+		$param = [
+			'table' => 'comments',
+			'select' => 'status,COUNT(*) as count',
+			'where' => ['postID' => $postID],
+			'group_by' => ['status']
+		];
+
+		$output = $this->CI->model->get($param);
+
+		return (count($output))? $output : null;
+	}
+
+	public function updateCommentCount($postID = null) {
+
+		$comments = $this->getCommentCount($postID);
+		if(!$comments) { return null; }
+
+		$l = count($comments);
+		foreach ($comments as $i => $val) {
+			if($val['status'] == 3) {
+				$this->patch($postID, ['commentCount' => $val['count']], true);
+				break;
+			}
+		}
 	}
 }
 

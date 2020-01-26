@@ -125,44 +125,57 @@ var admin = function() {
 			init();
 			repositionElements();
 			Core.dropdown();
-			checkSession(false);
+			checkSession(true);
 
 			// dropzone uploader
-			var input = 'dz-file';
-			$.each($('.dropzone'), function(i, el) {
-				var ins, label;
-				el.append('<input type="file" name="'+input+'"><span class="btn-group axns"><a class="btn btn-save"><i class="ion ion-checkmark"></i></a><a class="btn btn-red btn-cancel"><i class="ion ion-close-round"></i></a></span><span class="placeholder">Choose a file</span>');
-				ins = el.children('input[name="'+input+'"]');
+			var input = 'dz-file', dz = $('.dropzone');
+			for (var i = dz.length-1; i >= 0; i--) {
+				var ins, label, el = dz.eq(i);
+				el.append('<input type="file" name="'+input+'"><span class="btn-group axns"><a class="btn btn-save"><i class="ion ion-checkmark"></i></a><a class="btn btn-red btn-cancel"><i class="ion ion-close-round"></i></a></span><span class="placeholder">Choose a file</span><input type="hidden" name="dz-path" value="">');
+				ins = el.children(':input');
 				label = el.children('.placeholder');
-				ins.change(function(e) {
+
+				ins.eq(0).change(function(e) {
 					if(e.target.files.length) {
 						var reader = new FileReader();
 						reader.onload = function (e) {
 							label.html('<img src="'+e.target.result+'">');
 						}
-						reader.readAsDataURL(ins[0].files[0]);
+						reader.readAsDataURL(ins.eq(0)[0].files[0]);
 						el.addClass('valid');
 					} else { el.removeClass('valid'); }
 				});
+				ins.eq(1).change(function() {
+					var el = $(this), val = el.val();
+					if(val) {
+						label.html('<img src="'+window.url.base+'/'+val+'">');
+						el.addClass('done');
+						ins.eq(0).val('');
+					}
+				});
 				el.find('.btn-cancel').click(function() {
+					el.removeClass('valid done');
+					ins.val('');
+					label.html('Choose a file');
 				});
 				el.find('.btn-save').click(function() {
-					if(!ins[0].files.length) { return null; }
-					el.addClass('blocked loading');
+					if(!ins.eq(0)[0].files.length) { return null; }
+					Core.block(el);
 					var fd = new FormData();
-					fd.append(input, ins[0].files[0], ins[0].files[0].name);
-					API.ajax('api/posts/uploader/'+input, 'post', {
+					fd.append(input, ins.eq(0)[0].files[0], ins.eq(0)[0].files[0].name);
+					API._ajax('api/posts/uploader/'+input, 'post', {
 						data: fd,
 						contentType: false,
 						headers: {enctype: 'multipart/form-data'},
 						success: function(r) {
-							el.removeClass('blocked loading valid').addClass('done');
-							ins.val('');
-							console.log(r);
+							Core.unblock(el);
+							el.removeClass('valid').addClass('done');
+							ins.eq(0).val('');
+							ins.eq(1).val(r.path);
 						}
 					});
 				});
-			});
+			};
 		},
 		checkSession: function() {
 			checkSession(true);

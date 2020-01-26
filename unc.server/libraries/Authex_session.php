@@ -38,42 +38,50 @@ class Authex_session {
 		return $this->CI->model->createTable($this->sessionTable, $table, $loadForge);
 	}
 
-	/**
-	 * Check headers for sessionID and authToken. Use this only in restful api calls.
-	 * In other cases, use checkCookies method of this class.
-	 * @param	bool		$hasToken		whether to check authToken too
-	 * @return	mixed		null if no sessionID or authToken found, else headers array
-	 */
-	public function checkHeaders($hasToken = true) {
+	public function getSessionID($getToken = true) {
 
-		$headers = getallheaders();
-
-		# if sessionID or authToken not set in headers, then return null
-		if(!isset($headers['sessionID']) || ($hasToken && !isset($headers['authToken']))) {
-			return null;
-		}
-
-		// return elements(['sessionID', 'authToken'], $headers);
-		return $headers;
+		return ($this->CI->isAPI)? $this->checkHeaders($getToken) : $this->checkCookies($getToken);
 	}
 
 	/**
-	 * Check cookies for sessionID and authToken. Use this only in non-api calls.
-	 * In api calls, use checkHeaders method of this class.
-	 * @param	bool		$hasToken		whether to check authToken too
+	 * Check headers for sessionID and authToken.
+	 * @param	bool		$checkToken		whether to check authToken too
+	 * @return	mixed		null if no sessionID or authToken found, else headers array
+	 */
+	public function checkHeaders($checkToken = true) {
+
+		return $this->_checkSessionID(getallheaders(), $checkToken);
+	}
+
+	/**
+	 * Check cookies for sessionID and authToken.
+	 * @param	bool		$checkToken		whether to check authToken too
 	 * @return	mixed		null if no sessionID or authToken found, else cookies array
 	 */
-	public function checkCookies($hasToken = true) {
+	public function checkCookies($checkToken = true) {
 
-		$cookies = $this->CI->input->cookie();
+		return $this->_checkSessionID($this->CI->input->cookie(), $checkToken);
+	}
 
-		# if sessionID or authToken not set in cookies, then return null
-		if(!isset($cookies['sessionID']) || ($hasToken && !isset($cookies['authToken']))) {
+	private function _checkSessionID($data, $checkToken) {
+
+		if(isset($data['sessionid'])) {
+			$data['sessionID'] = $data['sessionid'];
+			unset($data['sessionid']);
+		}
+
+		if(isset($data['authtoken'])) {
+			$data['authToken'] = $data['authtoken'];
+			unset($data['authtoken']);
+		}
+
+		# if sessionID or authToken not set in data, then return null
+		if(!isset($data['sessionID']) || ($checkToken && !isset($data['authToken']))) {
 			return null;
 		}
 
-		// return elements(['sessionID', 'authToken'], $cookies);
-		return $cookies;
+		// return elements(['sessionID', 'authToken'], $data);
+		return $data;
 	}
 
 	/**
@@ -82,7 +90,7 @@ class Authex_session {
 	 * @param	bool		$persistent 	whether to create a persistent session
 	 * @return	string		sessionID
 	 */
-	private function _setSessionID($time = null, $persistent = false) {
+	public function newSessionID($time = null, $persistent = false) {
 
 		if(!$time) { $time = time(); }
 
@@ -162,7 +170,7 @@ class Authex_session {
 				$session['ipAddress'] = $this->CI->input->ip_address();
 
 				# generate new sessionID
-				$session['sessionID'] = $this->_setSessionID($time, $persistent);
+				$session['sessionID'] = $this->newSessionID($time, $persistent);
 				$session['sessionExpiry'] = $this->_getExpiryFromTime($time, $persistent);
 			}
 		}
@@ -249,67 +257,71 @@ class Authex_session {
 		if($data['sessionID']) {
 			$session = $this->_getSession($data);
 
-			# if session does not exist, then user is already logged out
-			# it happens in case of race conditions
-			if(!count($session)) {
-				return null;
-			}
+			# if session exists, then update the old session
+			if(count($session)) {
 
-			# if the session record exists, then use old sessionID in where clause for update query
-			$param['where'] = ['sessionID' => $session[0]['sessionID']];
+				# if the session record exists, then use old sessionID in where clause for update query
+				$param['where'] = ['sessionID' => $session[0]['sessionID']];
 
-			# renew sessionID if expired
-			$session = $this->_renewSessionIfExpired($session[0], $data['sessionID'], $time);
-			$session['ipAddress'] = $this->CI->input->ip_address();
-			$session['userAgent'] = $this->CI->agent->agent_string();
+				# renew sessionID if expired
+				$session = $this->_renewSessionIfExpired($session[0], $data['sessionID'], $time);
+				$session['ipAddress'] = $this->CI->input->ip_address();
+				$session['userAgent'] = $this->CI->agent->agent_string();
 
-			# if old session's data to be preserved
-			if(!$overWrite) {
+				# if old session's data to be preserved
+				if(!$overWrite) {
 
-				# if old userData exists
-				if($session['userData']) {
-					$session['userData'] = json_decode($session['userData'], true);
+					# if old userData exists
+					if($session['userData']) {
+						$session['userData'] = json_decode($session['userData'], true);
 
-					# merge the old and new userData
-					if($data['userData']) {
-						$session['userData'] = array_merge($session['userData'], $data['userData']);
+						# merge the old and new userData
+						if($data['userData']) {
+							$session['userData'] = array_merge($session['userData'], $data['userData']);
+						}
+					}
+
+					# else use new userData
+					else {
+						$session['userData'] = $data['userData'];
 					}
 				}
 
-				# else use new userData
+				# overwrite session data
 				else {
-					$session['userData'] = $data['userData'];
+					if($data['userData']) { $session['userData'] = $data['userData']; }
 				}
-			}
-
-			# overwrite session data
-			else {
 				if($data['authToken']) { $session['authToken'] = $data['authToken']; }
 				if($data['userID']) { $session['userID'] = $data['userID']; }
-				if($data['userData']) { $session['userData'] = $data['userData']; }
-			}
 
-			# update session record in db
-			$param['data'] = $session;
-			$param['data']['userData'] = json_encode($param['data']['userData']);
-			$this->CI->model->update($param, false);
+				# update session record in db
+				$param['data'] = $session;
+				if($param['data']['userData'] !== null) {
+					$param['data']['userData'] = json_encode($param['data']['userData']);
+				}
+				$this->CI->model->update($param, false);
+
+				# sanitize and return
+				unset($session['sessionID2']);
+				return $session;
+			} else { $data['sessionID2'] = $data['sessionID']; }
 		}
 
 		# create new session
-		else {
-			$session = $data;
-			$session['sessionID'] = $this->_setSessionID($time, $persistent);
-			$session['sessionExpiry'] = $this->_getExpiryFromTime($time, $persistent);
-			$session['sessionID2'] = null;
-			$session['ipAddress'] = $this->CI->input->ip_address();
-			$session['userAgent'] = $this->CI->agent->agent_string();
-			$session['lastActivity'] = $time;
+		$session = $data;
+		$session['sessionID'] = $this->newSessionID($time, $persistent);
+		$session['sessionExpiry'] = $this->_getExpiryFromTime($time, $persistent);
+		if(!isset($session['sessionID2'])) { $session['sessionID2'] = null; }
+		$session['ipAddress'] = $this->CI->input->ip_address();
+		$session['userAgent'] = $this->CI->agent->agent_string();
+		$session['lastActivity'] = $time;
 
-			# insert session record in db
-			$param['data'] = $session;
+		# insert session record in db
+		$param['data'] = $session;
+		if($param['data']['userData'] !== null) {
 			$param['data']['userData'] = json_encode($param['data']['userData']);
-			$this->CI->model->insert($param);
 		}
+		$this->CI->model->insert($param);
 
 		# sanitize and return
 		unset($session['sessionID2']);

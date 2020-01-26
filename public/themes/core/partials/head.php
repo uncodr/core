@@ -1,3 +1,6 @@
+<?php
+if(isset($this->siteConfigs['siteTitle'])) { $heading .= ' « '.$this->siteConfigs['siteTitle']; }
+?>
 	<meta charset="utf-8">
 	<title><?= $heading; ?></title>
 	<base href="<?= $this->baseURL; ?>">

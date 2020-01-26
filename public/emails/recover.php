@@ -6,7 +6,7 @@
 		<td style="min-height: 300px; vertical-align: top; padding: 20px;">
 			<p>Hi <?= $name; ?>,</p>
 			<p>It appears that you have requested for a password reset. Your OTP is<br><br><span style="font-size: 2em;"><?= $otp; ?></span></p>
-			<p>Alternatively, you can <a href="<?= ($this->baseURL).'auth/reset/'.$vcode; ?>" target="_blank">CLICK HERE</a> or copy-&amp;-paste the link below:<br><?= ($this->baseURL).'auth/reset/'.$vcode; ?></p>
+			<p>Alternatively, you can <a href="<?= ($this->baseURL).'auth/reset/'.$vcode; ?>" target="_blank" style="font-size: 1.25em;">CLICK HERE</a> or copy-&amp;-paste the link below:<br><?= ($this->baseURL).'auth/reset/'.$vcode; ?></p>
 			<p>If you have not requested the password reset, please ignore this email.</p>
 		</td>
 	</tr>

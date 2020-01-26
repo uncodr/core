@@ -234,6 +234,9 @@
 		// if history object changes
 		window.onpopstate = function(e) { showTab(); }
 	};
+	admin.tags = function() {
+		tags.init();
+	}
 	admin.themes = function() {
 	};
 })();

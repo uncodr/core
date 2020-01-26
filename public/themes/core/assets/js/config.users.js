@@ -22,13 +22,15 @@
 		// ajax success function
 		data.success = function(r) {
 			_populateList({data: r.data, page: data.page, reset: resetTable, groups: r.groups});
+			var history = window.history.state;
 			if(r.meta) {
 				_filterSetup(r.meta);
-				var history = window.history.state;
 				history.meta = r.meta;
 				window.history.replaceState(history, '', Core.changeHash(window.location.hash.substring(1)));
 			}
-			_paginateSetup();
+			if(history.meta) {
+				_paginate(history.meta, {status: data.status, page: data.page});
+			}
 		};
 		// ajax error function
 		data.error = function(r) {
@@ -73,13 +75,35 @@
 			// replace all values in handlebars
 			trHTML = trHTML.replaceMoustache(obj.data[i]);
 			trTemp.html(trHTML);
-			// insert in table body
 			tBody.append(trTemp);
 		}
 	},
 	_filterSetup = function(meta) {
 	},
-	_paginateSetup = function() {
+	_paginate = function(meta, params) {
+		Core.pagination(
+			{
+				itemCount: (params.status)? meta.count[params.status] : meta.count.all,
+				activePage: params.page,
+				pageSize: meta.pageSize
+			}, {
+				onPageChange: function(n) {
+					var history = window.history.state, hash = 'status:'+history.status;
+					history.page = n;
+					if(history.search) { hash += '/search:'+history.search; }
+					hash += '/page:'+n;
+					window.history.pushState(history, '', Core.changeHash(hash));
+					delete history.meta;
+
+					var tRows = tBody.children('.page-'+n);
+					if(tRows.length) {
+						admin.resetMultiCheck();
+						tBody.children().addClass('hidden');
+						tRows.removeClass('hidden');
+					} else { _listUser(history, false, false); }
+				}
+			}
+		);
 	},
 	listEvents = function() {
 	},
@@ -320,6 +344,18 @@
 			el = el.closest('.row').find(':input[name="expiry"]');
 			el.val((exp)? Core.getDate(exp, 'd/m/Y') : '');
 		});
+		$('input[name="search"]').change(function() {
+			var el = $(this), history = {status: 'all', page: 1, search: el.val()}, url;
+			/*history = window.location.hash.replace('#','').jsonify('/',':');
+			history.page = 1;
+			history.search = el.val();*/
+			url = 'status:'+history.status;
+			if(history.search) { url += '/search:'+history.search; }
+			else { delete history.search; }
+			window.history.pushState(history, '', Core.changeHash(url));
+			_listUser(history, true, true);
+			return false;
+		});
 	},
 	initUsers = function() {
 		var hash = window.location.hash,
@@ -376,7 +412,7 @@
 	admin.users = function() {
 		window.url.reload = false;
 		sections = {list: $('section.users-list'), edit: $('section.users-edit')};
-		tBody = $('#user-list');
+		tBody = sections.list.find('tbody');
 		filters = $('.toolbar .filters');
 		// post = {form: $('div.process-post')};
 
@@ -387,7 +423,11 @@
 		Core.multiCheck();
 		Core.modal('.user-add').events();
 		$('form.register').submit(function() {
-
+			var data = Core.validateForm($(this));
+			data.success = function() {
+				toastr['success']('User added');
+			}
+			API.auth().register(data);
 		});
 
 		// if history object changes

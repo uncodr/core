@@ -27,7 +27,7 @@ var auth = {};
 		if(data) {
 			// data.password = Core.encrypt(data.password);
 			data.success = function(r) {
-				_loginSuccess(r.data, next);
+				_loginSuccess(r, next);
 			};
 			data.error = function(r) {
 				toastr['error'](r.responseJSON.message);

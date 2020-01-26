@@ -4,7 +4,6 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 class Posts extends UnCodr {
 
 	public $template = 'index';
-	public $partials = [];
 
 	public function __construct() {
 
@@ -33,8 +32,7 @@ class Posts extends UnCodr {
 		$data['heading'] = $this->siteConfigs['siteTitle'];
 		$data['pageType'] = 'homepage';
 		$data['navMenu'] = $this->_navMenu();
-		$this->partials = $this->themeConfigs($this->theme);
-		if(isset($this->partials['partialsActive'])) { $this->partials = $this->partials['partialsActive']; }
+		$data['themeConf'] = $this->_loadThemeConf();
 
 		$this->load->view(templatePath($this->template, $this->theme), $data);
 	}
@@ -49,11 +47,10 @@ class Posts extends UnCodr {
 		if(!$slug) { redirect($this->baseURL); }
 		elseif($slug == 'admin') { redirect(($this->baseURL).'auth'); }
 
+		$this->load->library('cms');
+		$params = ['sort' => ['-publishedOn'], 'status' => 'published', 'slug' => $slug, 'type' => 'article', 'page' => 1, 'meta' => true];
+		$data = $this->cms->get(null, $params);
 		$data['bodyClass'] = 'page';
-		$data['posts'] = $this->model->get([
-			'table' => 'posts',
-			'where' => ['slug' => $slug]
-		]);
 		if(count($data['posts'])) {
 			$data['heading'] = $data['posts'][0]['title'];
 		} else {
@@ -63,9 +60,21 @@ class Posts extends UnCodr {
 		$data['pageType'] = 'single';
 
 		$data['navMenu'] = $this->_navMenu();
-		$this->partials = $this->themeConfigs($this->theme);
-		if(isset($this->partials['partialsActive'])) { $this->partials = $this->partials['partialsActive']; }
+		$data['themeConf'] = $this->_loadThemeConf();
+
 		$this->load->view(templatePath($this->template, $this->theme), $data);
+	}
+
+	private function _loadThemeConf() {
+
+		$out = $this->themeConfigs($this->theme);
+		if(isset($out['partialsPost'], $out['partials'])) {
+			foreach ($out['partialsPost'] as $key => $value) {
+				$out['partials'][$key] = $out['partials']['posts'][$value];
+			}
+			unset($out['partialsPost']);
+		}
+		return $out;
 	}
 
 	private function _loadApp($path = []) {

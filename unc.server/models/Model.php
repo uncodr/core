@@ -45,16 +45,21 @@ class Model extends CI_Model {
 
 		# connect to the default database
 		else {
-			$this->load->database();
-			if(!$this->db->conn_id) {
-				if($reset) {
-					$this->dbReset();
-					redirect(($this->baseURL).'setup');
-				}
-				return false;
+			if(!file_exists(APPPATH.'config/database.php')) {
+				return $this->_onConnectionError($reset);
 			}
-			return true;
+
+			$this->load->database();
+			return (!$this->db->conn_id)? $this->_onConnectionError($reset) : true;
 		}
+	}
+
+	private function _onConnectionError($reset) {
+		if($reset) {
+			$this->dbReset();
+			redirect(($this->baseURL).'setup');
+		}
+		return false;
 	}
 
 	/**
@@ -426,6 +431,21 @@ class Model extends CI_Model {
 		}
 	}
 
+	public function logFile($data) {
+
+		$file = APPPATH.'logs/uncodr/';
+		$file .= date('Y-m-d').'.php';
+		if(gettype($data) != 'string') { $data = json_encode($data); }
+
+		# Buffer Ouput
+		ob_start();
+			echo 'TIME: '.date('H:i:s').';  IP: '.$_SERVER['REMOTE_ADDR']."\n";
+			echo 'URL: '.($this->uri->uri_string())."\n";
+			echo 'DATA: '.$data."\n\n";
+			file_put_contents($file, ob_get_contents(), FILE_APPEND);
+		ob_end_clean();
+	}
+
 	/**
 	 * insert record in db log table
 	 * @param	array		$param 			keys: table, where/where_in
@@ -447,7 +467,7 @@ class Model extends CI_Model {
 				'addedOn' => time()
 			];
 			return $this->db->insert('logs', $data);
-		} else { return true; }
+		} else { return false; }
 	}
 
 	public function listTables($cached = false) {
@@ -538,4 +558,120 @@ class Model extends CI_Model {
 		return $structure;
 	}
 
+	public function getMeta($table, $params) {
+
+		$params = elements(['where','limit','getID'], $params);
+		if(!$params['where']) { return []; }
+
+		# prepare query parameters
+		$param = apiWhereByType(['table' => $table.'_meta', 'select' => 'key, value'], $params['where']);
+		if($params['limit']) { $param['limit'] = apiGetOffset($params['limit']); }
+		if($params['getID']) { $param['select'] = '*'; }
+
+		$data = $this->get($param, false);
+		return (!isset($data[0]))? [] : (!$params['getID']? array_column($data, 'value', 'key') : $data);
+	}
+
+	public function countMeta($table, $where) {
+
+		$key = array_keys($where)[0];
+		return $this->get([
+			'select' => $key.', count(`'.$key.'`) as count',
+			'group_by' => $key,
+			'table' => $table.'_meta',
+			'where' => $where
+		]);
+	}
+
+	/**
+	 * insert meta in any table
+	 * @param	string $table table identifier [_meta is concactenated by default]. E.g.: 'posts' for posts_meta, 'users' for users_meta
+	 * @param	array	$data	can be an array with key value pair or a multi-dimensional array. column name is also required.
+	 *											 E.g.:
+	 *											 [
+	 *											 		'postID' => 23,
+	 *											 		'data' => ['meta1' => 'value1', 'meta2' => 'value2']
+	 *											 ]
+	 *											 or
+	 *											 [
+	 *											 		'postID' => 23,
+	 *											 		'data' => [
+	 *											 			['key' => 'meta1', 'value' => 'value1'],
+	 *											 			['key' => 'meta2', 'value' => 'value2']
+	 *											 		]
+	 *											 ]
+	 */
+	public function putMeta($table, $data = []) {
+
+		if(!isset($data['data'])) { return null; }
+
+		$tempData = $data['data'];
+		unset($data['data']);
+		$out = [];
+
+		if(isAssoc($tempData)) {
+			foreach ($tempData as $key => $value) {
+				$data['key'] = $key;
+				$data['value'] = $value;
+				array_push($out, $data);
+			}
+		} else {
+			foreach ($tempData as $val) {
+				$data['key'] = $val['key'];
+				$data['value'] = $val['value'];
+				array_push($out, $data);
+			}
+		}
+
+		return $this->insert([
+			'table' => $table.'_meta',
+			'data' => $out
+		]);
+	}
+
+	public function patchMeta($table, $data = []) {
+
+		if(!isset($data['data'])) { return null; }
+
+		$tempData = $data['data'];
+		unset($data['data']);
+		$out = [];
+
+		if(isAssoc($tempData)) {
+			foreach ($tempData as $key => $value) {
+				$data['key'] = $key;
+				$out[$key] = $this->_update([
+					'table' => $table.'_meta',
+					'data' => ['value' => $value],
+					'where' => $data
+				]);
+			}
+		} elseif(gettype($tempData) == 'array') {
+			foreach ($tempData as $val) {
+				$data['key'] = $val['key'];
+				$out[$val['key']] = $this->_update([
+					'table' => $table.'_meta',
+					'data' => ['value' => $val['value']],
+					'where' => $data
+				]);
+			}
+		}
+
+		return $out;
+	}
+
+	public function deleteMeta($table, $where) {
+
+		# prepare query parameters
+		$param = ['table' => $table.'_meta', 'where' => []];
+
+		# if $where['key'] is array, use 'where_in', if string or integer, use 'where'
+		if(isset($where['key'])) {
+			$param = apiWhereByType($param, ['key' => $where['key']]);
+			unset($where['key']);
+		}
+		$param['where'] = array_merge($param['where'], $where);
+
+		return $this->_delete($param);
+	}
 }

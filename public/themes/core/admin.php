@@ -59,6 +59,9 @@
 <?php loadTemplate('partials/js-common', 'core'); ?>
 <script type="text/javascript" src="<?= assetURL('js/api.js', 'core'); ?>"></script>
 <script type="text/javascript" src="<?= assetURL('js/admin.js', 'core'); ?>"></script>
+<script type="text/javascript" src="<?= assetURL('js/pagination.js', 'core'); ?>"></script>
+<script type="text/javascript" src="<?= assetURL('js/meta.js', 'core'); ?>"></script>
+<script type="text/javascript" src="<?= assetURL('js/tags.js', 'core'); ?>"></script>
 <script type="text/javascript" src="<?= assetURL('third_party/tinymce/tinymce.min.js', 'core'); ?>"></script>
 <script type="text/javascript">admin.init();</script>
 <?php loadTemplate('partials/js-dynamic', 'core'); ?>

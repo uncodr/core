@@ -25,18 +25,20 @@ class Admin extends UnCodr {
 				$data['js']['fn'] = ['admin.dashboard()'];
 				break;
 			case 'posts':
+				if(!isset($path[1])) { redirect(($this->baseURL).'admin/posts/pages'); }
 				if($path[1] == 'media') {
 					$data['heading'] = 'Media';
 					$data['page'] .= 'posts/media';
 					$data['js']['fn'] = ['admin.media()'];
+					$data['js']['files'] = ['posts.media'];
 				} else {
 					$data['page'] .= 'posts/posts';
 					$subPage = substr($path[1], 0, -1);
 					$data['heading'] = ucfirst($subPage).'s';
 					$data['subPage'] = $subPage;
 					$data['js']['fn'] = ['admin.posts(\''.$subPage.'\')'];
+					$data['js']['files'] = ['posts'];
 				}
-				$data['js']['files'] = ['posts'];
 				break;
 			case 'plugins':
 				if(isset($path[1])) {
@@ -45,8 +47,6 @@ class Admin extends UnCodr {
 				} else {
 					$data['heading'] = 'Plugins';
 					$data['page'] .= 'plugins';
-					$data['js']['files'] = [];
-					$data['js']['fn'] = [];
 				}
 				break;
 			case 'config':

@@ -10,8 +10,8 @@
 <body class="<?= $bodyClass; ?>">
 
 <?php
-loadTemplate($this->partials['header'], 'earth');
-loadTemplate($this->partials[$pageType], 'earth');
+loadTemplate($themeConf['partials']['headers'][0], 'earth');
+loadTemplate($themeConf['partials'][$pageType], 'earth');
 loadTemplate('partials/js-common', 'core');
 ?>
 

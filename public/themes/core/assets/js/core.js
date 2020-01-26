@@ -253,8 +253,8 @@ var Core = function() {
 			selector: element,
 			height: options.height || 340,
 			menubar: false,
-			toolbar: 'styleselect | bold italic strikethrough | alignleft aligncenter alignright | bullist numlist blockquote | link removeformat',
-			plugins : 'advlist autolink link lists wordcount visualblocks',
+			toolbar: 'styleselect | bold italic strikethrough | alignleft aligncenter alignright | bullist numlist blockquote | link removeformat | code',
+			plugins : 'advlist autolink code link lists wordcount visualblocks',
 			elementpath: false,
 			style_formats: [
 				{
@@ -350,7 +350,7 @@ var Core = function() {
 		// check whether required inputs have value
 		$.each(form, function(i) {
 			el = form.eq(i);
-			if(el.prop('required') && el.val()==='') {
+			if(el.prop('required') && (el.val()===''||el.val()===null)) {
 				valid = false;
 				el.focus();
 				Core.tempClass(el, 'shake-xy');

@@ -10,7 +10,7 @@ function b64encode($str) {
 
 	# encode and replace url unsafe characters
 	$str = base64_encode($str);
-	return str_replace(array('+', '/', '='), array('-', '_', ''), $str);
+	return str_replace(['+', '/', '='], ['-', '_', ''], $str);
 }
 
 /**
@@ -22,7 +22,7 @@ function b64encode($str) {
 function b64decode($str) {
 
 	# replace url safe characters with base64 encoded characters
-	$str = str_replace(array('-', '_'), array('+', '/'), $str);
+	$str = str_replace(['-', '_'], ['+', '/'], $str);
 
 	# append "=" to make length a multiple of 4
 	$mod4 = strlen($str) % 4;
@@ -65,6 +65,13 @@ function unshuffler($haystack) {
 		$n[$i] = $haystack[$k];
 	}
 	return implode('', $n);
+}
+
+function aesEncrypt($val, $key, $cipher = 'aes-256-cbc') {
+	$key = hash('sha256', $key, true);
+	$output = openssl_encrypt($val, $cipher, $key, OPENSSL_RAW_DATA);
+
+	return b64encode($output);
 }
 
 function getPermission($axn, $groups) {

@@ -42,8 +42,8 @@ class Config extends UnCodr {
 
 	/**
 	 * update post
-	 * @param   array	   $validFields			config fields which can be updated
-	 * @return  array	   affected config fields (keys)
+	 * @param	 array		 $validFields			config fields which can be updated
+	 * @return	array		 affected config fields (keys)
 	 */
 	private function _patchConfig($validFields) {
 
@@ -112,7 +112,7 @@ class Config extends UnCodr {
 		$search = (isset($param['search']))? $param['search'] : null;
 		$groupID = (isset($param['gid']))? $param['gid'] : null;
 		$getMeta = (isset($param['meta']))? $param['meta'] : null;
-		$offset = apiGetOffset($param, 50);
+		$offset = apiGetOffset($param);
 
 		# if userID is passed, then use it while getting users
 		if($userID) { $param['userID'] = $userID; }
@@ -134,31 +134,32 @@ class Config extends UnCodr {
 		$orderBy = (isset($param['sort']))? apiGetOrderBy($param['sort'], 'users', ['id' => 'userID']): ['users.addedOn' => 'DESC'];
 
 		# if fields are sent, then use it as $select
-		$select = 'users.userID as id, email, login, screenName, users.name, lastLogin, loginCount, emailVerified, users.status, users.addedOn, users.lastUpdatedOn';
+		$select = ['fields' => 'users.userID as id, email, login, screenName, users.name, lastLogin, loginCount, emailVerified, users.status, users.addedOn, users.lastUpdatedOn'];
 		if(isset($param['fields'])) { $select = $this->_selectUsersColumns(json_decode($param['fields'], true)); }
 
-		if($select['fields']) {
+		# unset keys which do not correspond to db columns
+		unset($param['meta'], $param['start'], $param['page'], $param['fields'], $param['sort'], $param['gid'], $param['search']);
 
-			# unset keys which do not correspond to db columns
-			unset($param['meta'], $param['start'], $param['page'], $param['fields'], $param['sort'], $param['gid'], $param['search']);
+		# prepare parameters array for fetching data
+		$param2 = [
+			'table' => 'users',
+			'where' => $param,
+			'select' => $select['fields'],
+			'order_by' => $orderBy,
+			'limit' => $offset
+		];
+		if($groupID) {
+			$param2['join'] = ['groups_users' => 'groups_users.userID = users.userID'];
+			$param2['where']['groups_users.groupID'] = $groupID;
+		}
 
-			# prepare parameters array for fetching data
-			$param2 = [
-				'table' => 'users',
-				'where' => $param,
-				'select' => $select['fields'],
-				'order_by' => $orderBy,
-				'limit' => $offset
-			];
+		# if search was set in get parameters, then match in email and login name
+		if($search) {
+			$param2['groupClause'] = ['like' => ['email' => $search], 'or_like' => ['login' => $search]];
+		}
 
-			# if search was set in get parameters, then match in email and login name
-			if($search) {
-				$param2['groupClause'] = ['like' => ['email' => $search], 'or_like' => ['login' => $search]];
-			}
-
-			# fetch data, and if it exists, then set exitCode as 200
-			$data = $this->model->get($param2);
-		} else { $data = []; }
+		# fetch data, and if it exists, then set exitCode as 200
+		$data = $this->model->get($param2);
 
 		# if metadata is also to be fetched
 		if($getMeta) {
@@ -168,7 +169,7 @@ class Config extends UnCodr {
 			if($userID) {
 				if($getMeta == 'true') { $getMeta = true; }
 				else { $getMeta = json_decode($getMeta, true); }
-				$meta = $this->authex->getUserMeta($userID, $getMeta);
+				$meta = $this->model->getMeta('users', ['where' => ['userID' => $userID, 'key' => $getMeta]]);
 				$meta['_'] = $this->_permission;
 			}
 
@@ -176,7 +177,7 @@ class Config extends UnCodr {
 			else {
 				$meta['pageSize'] = $offset[0];
 				if(in_array('count', $getMeta)) {
-					$meta['count'] = $this->_countUsers($search);
+					$meta['count'] = $this->_countUsers($param2);
 				}
 			}
 			$this->exitCode = 200;
@@ -193,21 +194,16 @@ class Config extends UnCodr {
 		return compact('meta', 'data', 'groups');
 	}
 
-	private function _countUsers($search = null) {
+	private function _countUsers($param = null) {
 
 		$output = [
 			'all' => 0,
 			'active' => 0,
 			'inactive' => 0
 		];
-		$param = [
-			'table' => 'users',
-			'select' => 'status, count(status) as count',
-			'group_by' => 'status'
-		];
-		if($search) {
-			$param['groupClause'] = ['like' => ['email' => $search], 'or_like' => ['login' => $search]];
-		}
+		$param['select'] = 'users.status, count(*) as count';
+		$param['group_by'] = 'users.status';
+		unset($param['order_by'], $param['limit']);
 
 		$count = $this->model->get($param);
 		foreach($count as $c) {
@@ -227,7 +223,10 @@ class Config extends UnCodr {
 		$select = array_flip($select['users']);
 
 		if(isset($select['id'])) { $select['users.userID as id'] = $select['id']; }
-		unset($select['id'], $select['password'], $select['otp'], $select['groups']);
+		if(isset($select['status'])) { $select['users.status'] = $select['status']; }
+		if(isset($select['addedOn'])) { $select['users.addedOn'] = $select['addedOn']; }
+		if(isset($select['lastUpdatedOn'])) { $select['users.lastUpdatedOn'] = $select['lastUpdatedOn']; }
+		unset($select['id'], $select['password'], $select['otp'], $select['groups'], $select['status'], $select['addedOn'], $select['lastUpdatedOn']);
 
 		asort($select);
 		$select = array_flip($select);
@@ -235,7 +234,6 @@ class Config extends UnCodr {
 	}
 
 	private function _getGroupsByUserIDs($userIDs = null, $fields = null) {
-
 
 		$out = [];
 		if($userIDs === null) { return $out; }
@@ -307,7 +305,7 @@ class Config extends UnCodr {
 
 			if($data['meta']) {
 				$output = $this->authex->updateUserMeta($userID, $data['meta']);
-				if($output) { $this->exitCode = 204; }
+				$this->exitCode = 204;
 			}
 
 			if($data['group']) {
@@ -330,6 +328,7 @@ class Config extends UnCodr {
 				$output = $this->authex->updateUserGroup($userID, $param, $uGroups);
 				if($output) { $this->exitCode = 204; }
 			}
+			$this->runHook('users/patch', [$data]);
 		}
 	}
 

@@ -2,8 +2,31 @@ RewriteEngine on
 
 RewriteCond %{REQUEST_URI}::$1 ^(.*?/)(.*)::\2$
 RewriteRule ^(.*)$ - [E=BASE:%1]
+
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^ - [R=200]
+
 RewriteCond $1 !^(index\.php|robots\.txt|favicon\.ico|sitemap\.xml)
 RewriteRule ^(.*)$ %{ENV:BASE}index.php/$1 [L,QSA]
 
 # SetEnv CI_ENV 'production'
 SetEnv CI_ENV 'development'
+
+Header Always Set Access-Control-Allow-Origin "*"
+Header Always Set Access-Control-Allow-Methods "POST, GET, OPTIONS, PUT, PATCH, DELETE"
+Header Always Set Access-Control-Allow-Headers "Accept,Accept-Encoding,Accept-Language,Cache-Control,Connection,Content-Type,DNT,Host,Keep-Alive,Origin,Pragma,no-cache,Referer, User-Agent,If-Modified-Since,authToken,sessionID,enctype"
+
+Header unset ETag
+Header set Cache-Control "max-age=0, no-cache, no-store, must-revalidate"
+Header set Pragma "no-cache"
+Header set Expires "Wed, 1 Jan 2019 00:00:00 GMT"
+
+# <filesMatch "\.(html|htm|js|css)$">
+#   FileETag None
+#   <ifModule mod_headers.c>
+#     Header unset ETag
+#     Header set Cache-Control "max-age=0, no-cache, no-store, must-revalidate"
+#     Header set Pragma "no-cache"
+#     Header set Expires "Wed, 1 Jan 2019 00:00:00 GMT"
+#   </ifModule>
+# </filesMatch>

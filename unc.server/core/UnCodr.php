@@ -9,6 +9,7 @@ class UnCodr extends CI_Controller {
 	public $isAPI = false;
 	public $apiResponse = [];
 	public $session = [];
+	public $built = '19.08.03';
 
 	public function __construct($loadConfig = false) {
 
@@ -17,12 +18,11 @@ class UnCodr extends CI_Controller {
 		$this->baseURL = baseURL();
 		$this->config->set_item('base_url', $this->baseURL);
 		$this->output->set_header('X-Powered-By: '.APP_NAME, true);
-		// $this->output->set_header('X-Frame-Options: sameorigin', true);
+		$this->output->set_header('X-Frame-Options: sameorigin', true);
 
 		if($loadConfig) {
 
 			# connect to db and get autoload siteConfigs
-			$this->model->connect();
 			$this->siteConfigs = $this->siteConfigs();
 
 			# get theme
@@ -38,12 +38,23 @@ class UnCodr extends CI_Controller {
 		if($this->isAPI) {
 
 			# load api response message
-			# api response message has key as 'class.function.method'
+			# api response message has key as 'class.function.request-method'
 			if(!isset($this->apiResponse['message'])) {
 				$key = $this->router->fetch_class();
 				$key .= '.'.($this->router->fetch_method());
 				$key .= '.'.($this->input->method());
 				$this->apiResponse['message'] = $this->_apiMessage($key);
+			}
+
+			# if sessionID has been updated, then include it in response
+			if(!isset($this->apiResponse['sessionID'])) {
+				$headers = $this->authex->getSessionID(false);
+				if(!isset($this->session['sessionID'])) {
+					if(!$headers) { $this->apiResponse['sessionID'] = $this->authex->newSessionID(); }
+				}
+				elseif(!$headers || ($headers['sessionID'] != $this->session['sessionID'])) {
+					$this->apiResponse['sessionID'] = $this->session['sessionID'];
+				}
 			}
 
 			# output everything
@@ -80,7 +91,8 @@ class UnCodr extends CI_Controller {
 				304 => 'Not Modified',			# Cached data can be used.
 				400 => 'Bad Request',			# Request invalid or cannot be served, details in error payload (missing parameters, large file size).
 				401 => 'Unauthorized',			# User authentication missing or IP blocked.
-				403 => 'Forbidden',				# Access not allowed / When authentication succeeded but user doesn't have permissions.
+				// 403 => 'Forbidden',				# Access not allowed / When authentication succeeded but user doesn't have permissions.
+				403 => 'Permission Denied',				# Access not allowed / When authentication succeeded but user doesn't have permissions.
 				404 => 'Not Found',				# No resource behind the URI.
 				405 => 'Method Not Allowed',	# HTTP method not allowed. E.g. GET method accessed via POST; PUT/PATCH/DELETE on read-only resource.
 				406 => 'Not Acceptable',		# Character-set or other characteristics of resource do not match client request headers
@@ -131,50 +143,30 @@ class UnCodr extends CI_Controller {
 			if(!$success) { redirect(($this->baseURL).'setup'); }
 		}
 
-		else {
+		# load those configs which have autoload enabled
+		$param = [
+			'table' => 'configs',
+			'where' => ['autoload' => '1']
+		];
 
-			# load those configs which have autoload enabled
-			$param = [
-				'table' => 'configs',
-				'where' => ['autoload' => '1']
-			];
-
-			# if $key is passed, then ignore autoload and use $key as 'key'
-			if($key) {
-				switch(gettype($key)) {
-					case 'string':
-						$param['where'] = ['key' => $key];
-						break;
-					case 'array':
-						unset($param['where']);
-						$param['where_in'] = ['key' => $key];
-						break;
-					case 'boolean':
-						unset($param['where']);
-						break;
-				}
+		# if $key is passed, then ignore autoload and use $key as 'key'
+		if($key) {
+			if($key === true) { unset($param['where']); }
+			else {
+				$param = apiWhereByType($param, ['key' => $key]);
+				unset($param['where']['autoload']);
 			}
-
-			$output = $this->model->get($param);
-			/*try {
-
-				# get data and if none exists, then redirect to 'setup/config' page
-				$output = $this->model->get($param);
-				if(!count($output)) {
-					throw new Exception('Database Connection Error', 1);
-				}
-			} catch (Exception $e) {
-				redirect(($this->baseURL).'setup/config');
-			}*/
-
-			return array_column($output, 'value', 'key');
 		}
+
+		$output = $this->model->get($param);
+
+		return (isset($output[0]))? array_column($output, 'value', 'key') : [];
 	}
 
 	public function themeConfigs($theme = 'core') {
 
 		$output = [];
-		if(file_exists('public/themes/'.$theme.'/config.json')) {
+		if(file_exists(VIEWPATH.'themes/'.$theme.'/config.json')) {
 			$output = file_get_contents('public/themes/'.$theme.'/config.json');
 			$output = json_decode($output, true);
 		}
@@ -254,6 +246,29 @@ class UnCodr extends CI_Controller {
 		return $this->email->send();
 	}
 
+	public function postCurl($url, $data = null, $isJSON = false) {
+
+		$ch = curl_init();
+		curl_setopt($ch, CURLOPT_URL, $url);
+		curl_setopt($ch, CURLOPT_USERAGENT, APP_NAME);
+		if($data) {
+			curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+			if($isJSON) {
+				curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+				curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+			} else {
+				curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
+			}
+		} else {
+			curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
+		}
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_VERBOSE, true);
+		$output = curl_exec($ch);
+		curl_close($ch);
+		return $output;
+	}
+
 	public function errorPage($code = 404, $html = '') {
 
 		$data = [
@@ -276,38 +291,104 @@ class UnCodr extends CI_Controller {
 		# if parameters not passed
 		$params = func_get_args();
 		if(!isset($params[0])) { return null; }
-		if(!isset($params[1])) { $params[1] = $params[0]; }
+		$lib = $this->_findLib($params,'');
+		if($lib == null) { return null; }
 
-		# get the library name and method
-		if(!file_exists(APPPATH.'libraries/'.$params[0].'/'.ucfirst($params[1]).'.php')) { return null; }
-		$plugin = $params[0];
-		$libName = $plugin.'_'.$params[1];
-		$method = 'index';
-		$this->load->library($plugin.'/'.$params[1], null, $libName);
+		$pluginData = $this->_executeLibMethod($lib['path'], $lib['data']);
+		if($pluginData === null) { return null; }
+		// else { $pluginData = $pluginData['data']; }
 
-		if(isset($params[2]) && !is_numeric($params[2])) {
-			$method = $params[2];
-			unset($params[2]);
-		}
-		if($this->isAPI) {
-			$method = 'api'.ucfirst($method);
-		}
-		if(!method_exists($this->{$libName}, $method)) { return null; }
-
-		unset($params[0], $params[1]);
-		$params = array_values($params);
-		$pluginData = $this->{$libName}->{$method}(...$params);
-
+		# modify js file path for plugin
 		if($pluginData && isset($pluginData['js'], $pluginData['js']['files'])) {
 			foreach ($pluginData['js']['files'] as $key => $value) {
-				$pluginData['js']['files'][$key] = '../../../plugins/'.$plugin.'/'.$value;
+				if($lib['path'][0]) {
+					$pluginData['js']['files'][$key] = '../../../plugins/'.$lib['path'][0].$value;
+				} else {
+					$pluginData['js']['files'][$key] = '../../../plugins/'.$lib['path'][1].'/'.$value;
+				}
 			}
 		}
 		return $pluginData;
 	}
 
-	public function addHook($hook, $conf) {
+	private function _findLib($params, $dir = '') {
 
+		$path = APPPATH.'libraries/'.$dir;
+		if (file_exists($path.ucfirst($params[0]).'.php')) {
 
+			# default method name is index, unless third non-integer parameter specified
+			$className = $params[0];
+			$method = 'index';
+			if(isset($params[1]) && !is_numeric($params[1])) {
+				$method = $params[1];
+				unset($params[1]);
+			}
+			if($this->isAPI) { $method = 'api'.ucfirst($method); }
+			unset($params[0]);
+
+			return ['path' => [$dir, $className, $method], 'data' => array_values($params)];
+		}
+		elseif (is_dir($path.$params[0])) {
+
+			if(!isset($params[1]) || is_numeric($params[1])) {
+				array_splice($params, 1, 0, $params[0]);
+			}
+			$path = $params[0].'/';
+			unset($params[0]);
+			return $this->_findLib(array_values($params), $path);
+		}
+		else { return null; }
+	}
+
+	private function _executeLibMethod($lib, $data) {
+
+		$methodName = array_pop($lib);
+		$className = array_pop($lib);
+		$path = implode('/',$lib);
+		$lib = implode('_',$lib).'_'.$className;
+
+		# get the library name and method
+		if(!file_exists(APPPATH.'libraries/'.$path.'/'.ucfirst($className).'.php')) { return null; }
+		$this->load->library($path.'/'.$className, null, $lib);
+		if(!method_exists($this->{$lib}, $methodName)) { return null; }
+
+		return $this->{$lib}->{$methodName}(...$data);
+	}
+
+	public function runHook($hook, $data = []) {
+
+		$hookArr =	explode('/', $hook);
+		if(!isset($hookArr[1])) { return null; }
+		$hookName = 'hooks.'.$hookArr[0];
+		$output = [];
+
+		# load the hooks from configs table
+		$hooks = $this->siteConfigs($hookName);
+		if(!isset($hooks[$hookName])) { return null; }
+
+		# parse json and run the hook
+		$hooks = json_decode($hooks[$hookName], true);
+		if(isset($hooks[$hookArr[1]])) {
+			switch(gettype($hooks[$hookArr[1]])) {
+				case 'string':
+					$hooks = [$hooks[$hookArr[1]]];
+					break;
+				case 'array':
+					$hooks = $hooks[$hookArr[1]];
+					break;
+				default:
+					$hooks = [];
+					break;
+			}
+
+			# execute the hook
+			foreach($hooks as $h) {
+				$output[$h] = $this->_executeLibMethod(explode('/', $h), $data);
+			}
+		}
+		return $output;
+	}
+
+	public function addHook($hook, $value = '') {
 	}
 }

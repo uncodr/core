@@ -72,8 +72,8 @@
 						<ul class="list-group user-groups row">
 							<li class="title row bold">
 								<div class="col m-6">Groups <a class="btn sm group-add">Add</a></div>
-								<div class="col m-2 hidden-xs hidden-sm">Expiry</div>
-								<div class="col m-4 hidden-xs hidden-sm">Status</div>
+								<div class="col m-2 hidden-xs hidden-s">Expiry</div>
+								<div class="col m-4 hidden-xs hidden-s">Status</div>
 							</li>
 							<li class="add row border-bottom" style="display: none;">
 								<div class="col m-6">

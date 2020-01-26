@@ -15,7 +15,11 @@ class Posts extends UnCodr {
 
 		switch($this->input->method()) {
 			case 'get':
-				$this->apiResponse = $this->cms->get($postID, $this->input->get());
+				$getParams = $this->input->get();
+				if(!$this->_hasAccessLevel(1)) { $getParams['status'] = 'published'; }
+				if(isset($getParams['meta']) && $getParams['meta'] == 'true') { $getParams['meta'] = true; }
+
+				$this->apiResponse = $this->cms->get($postID, $getParams);
 				if($this->apiResponse) {
 					$this->exitCode = 200;
 					$this->apiResponse['data'] = $this->apiResponse['posts'];
@@ -41,15 +45,21 @@ class Posts extends UnCodr {
 	private function _put() {
 
 		# check if the user is logged in
-		if(!$this->authex->validateUser()) {
-			$this->exitCode = 401;
-			return [];
-		}
+		if(!$this->_hasAccessLevel(2)) { return []; }
 
 		$post = json_decode($this->input->raw_input_stream, true);
+
+		$meta = isset($post['meta']) ? $post['meta'] : ['put' => [], 'patch' => []];
+		unset($post['meta']);
+
 		$out = $this->cms->put($post, $this->session['userID']);
 
-		if(count($out)) { $this->exitCode = 201; }
+		if(isset($out['id'])) {
+			$this->exitCode = 201;
+			if(isset($meta['put'], $meta['put'][0])) {
+				$this->_putMeta($out['id'], $meta['put']);
+			}
+		}
 		return $out;
 	}
 
@@ -60,13 +70,22 @@ class Posts extends UnCodr {
 	private function _patch($postID = null) {
 
 		# check if the user is logged in
-		if(!$this->authex->validateUser()) {
-			$this->exitCode = 401;
-			return null;
-		}
+		if(!$this->_hasAccessLevel(2)) { return []; }
 
 		$post = json_decode($this->input->raw_input_stream, true);
+
+		$meta = isset($post['meta']) ? $post['meta'] : ['put' => [], 'patch' => []];
+		unset($post['meta']);
+
 		$out = $this->cms->patch($postID, $post);
+
+		if (isset($meta['put'][0])) {
+			$this->_putMeta($postID, $meta['put']);
+		}
+		if (isset($meta['patch'][0])) {
+			$this->_patchMeta($postID, $meta['patch']);
+		}
+
 
 		$this->exitCode = ($out)? 204 : 400;
 		return $out;
@@ -84,21 +103,16 @@ class Posts extends UnCodr {
 		}
 
 		# check if the user is logged in
-		if(!$this->authex->validateUser()) {
-			$this->exitCode = 401;
-			return null;
-		}
+		if(!$this->_hasAccessLevel(4)) { return []; }
 
-		# delete post
-		$affRows = $this->model->delete([
+		# delete post and its meta
+		$this->model->delete([
 			'table' => 'posts',
 			'where' => ['postID' => $postID]
 		], true);
-		if($affRows) {
-			$this->exitCode = 204;
-			return ['count' => $affRows];
-		}
-		return [];
+		$this->exitCode = 204;
+		$this->_deleteMeta($postID);
+		return ['count' => $affRows];
 	}
 
 	public function uploader($key = null) {
@@ -133,7 +147,7 @@ class Posts extends UnCodr {
 		$date = new DateTime();
 		$config =  [
 			'upload_path' => FCPATH.'public/uploads/'.($date->format('Y')).'/'.($date->format('m')).'/',
-			'allowed_types' => 'jpeg|jpg|png|doc|docx|pdf|txt|ppt|pptx|xls|xlsx',
+			'allowed_types' => 'svg|jpeg|jpg|png|doc|docx|pdf|txt|ppt|pptx|xls|xlsx',
 			'max_size' => 8192,
 			'remove_spaces' => true,
 			'file_name' => rand(1000,9999).time()
@@ -156,6 +170,94 @@ class Posts extends UnCodr {
 			return ['path' => str_replace(VIEWPATH, '', $config['full_path'])];
 		}
 	}
+
+	public function meta($postID = null) {
+
+		if(!$postID) {
+			$this->exitCode = 404;
+			return null;
+		}
+
+		$this->model->connect(null, false);
+		$this->load->library('cms');
+
+		switch($this->input->method()) {
+			case 'get':
+				$this->apiResponse = $this->_getMeta($postID, $this->input->get());
+				if($this->apiResponse['data']) { $this->exitCode = 200; }
+				break;
+			case 'put':
+				$this->apiResponse = $this->_putMeta($postID, json_decode($this->input->raw_input_stream, true));
+				break;
+			case 'post': case 'patch':
+				$this->apiResponse = $this->_patchMeta($postID, json_decode($this->input->raw_input_stream, true));
+				break;
+			case 'delete':
+				$this->apiResponse = $this->_deleteMeta($postID, $this->input->get());
+				break;
+		}
+	}
+
+	private function _getMeta($postID, $getParams) {
+
+		# get meta using postID
+		$limit = (isset($getParams['page']) || isset($getParams['start']))? elements(['page', 'start'], $getParams) : null;
+		$where = ['postID' => $postID];
+		if(isset($getParams['key'])) {
+			$where['key'] = json_decode($getParams['key'], true);
+		}
+		$data = $this->model->getMeta('posts', ['where' => $where, 'limit' => $limit]);
+
+		if(isset($data[0]) && isset($getParams['count'])) {
+			$meta = ['pageSize' => apiGetOffset($getParams)[0]];
+			unset($where['key']);
+			$meta['count'] = $this->model->countMeta('posts', $where);
+			$meta['count'] = (isset($meta['count'][0]))? $meta['count'][0]['count'] : 0;
+			return compact('data', 'meta');
+		} else { return ['data' => $data]; }
+	}
+
+	private function _putMeta($postID, $data) {
+
+		if(!$this->_hasAccessLevel(2)) { return []; }
+
+		if(isset($data['key'], $data['value'])) { $data = [$data]; }
+		$out = $this->model->putMeta('posts', ['postID' => $postID, 'data' => $data]);
+		$this->exitCode = ($out)? 201 : 401;
+	}
+
+	private function _patchMeta($postID, $data) {
+
+		if(!$this->_hasAccessLevel(2)) { return []; }
+
+		if(isset($data['key'], $data['value'])) { $data = [$data]; }
+		$out = $this->model->patchMeta('posts', ['postID' => $postID, 'data' => $data]);
+		$this->exitCode = ($out)? 204 : 401;
+	}
+
+	private function _deleteMeta($postID, $params) {
+
+		if(!$this->_hasAccessLevel(4)) { return []; }
+
+		$params = isset($params['key'])? ['key' => $params['key']] : [];
+		$params['postID'] = $postID;
+		$out = $this->model->deleteMeta('posts', $params);
+		$this->exitCode = ($out)? 204 : 401;
+	}
+
+	private function _hasAccessLevel($level) {
+
+		$permission = $this->authex->validateUser('posts');
+		if(!$permission) {
+			$this->exitCode = 401;
+			return false;
+		} elseif(!($permission & $level)) {
+			$this->exitCode = 403;
+			return false;
+		}
+		return true;
+	}
+
 
 
 

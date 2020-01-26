@@ -4,13 +4,14 @@
  * Dependency: ['core.js', '../third_party/js.cookies.js']
  */
 var API = function() {
-	// 'params' object keys: url, type, data, success, error, complete
 	var _getSession = function() {
-		return {
+		var out = {
 			sessionID: localStorage.getItem('sessionID'),
 			authToken: localStorage.getItem('authToken')
 		};
+		return (out.sessionID && out.authToken)? out : {};
 	},
+	// 'params' object keys: url, type, data, success, error, complete, optionals: contentType, headers
 	_ajax = function(params) {
 		var data = {
 			processData: false,
@@ -19,7 +20,10 @@ var API = function() {
 			type: params.type,
 			url: 'api/'+params.url,
 			data: params.data || null,
-			success: params.success,
+			success: function(r) {
+				if((r != undefined) && (r.sessionID != undefined)) { localStorage.setItem('sessionID', r.sessionID); }
+				params.success(r);
+			},
 			error: function(r) {
 				if(r.status == 401) { window.location.href = 'auth/logout'; }
 				else if(r.status == 403) { window.location.href = 'admin'; }
@@ -53,7 +57,7 @@ var API = function() {
 		delete data.success;
 		delete data.error;
 		delete data.complete;
-		output.data = data;
+		output.data = (data.data == undefined)? data : data.data;
 		return output;
 	},
 	_generic = function(url, type) {
@@ -101,11 +105,14 @@ var API = function() {
 	};
 
 	return {
-		_ajax: function(url, type, params){
+		_ajax: function(url, type, params) {
 			params = _sanitize(params);
 			params.type = type;
 			params.url = '../'+url;
-			if(params.id) { params.url += '/'+params.id; }
+			if(params.id) {
+				params.url += '/'+params.id;
+				delete params.id;
+			}
 			if((params.headers == undefined) || params.headers.enctype != 'multipart/form-data') {
 				params.data = (type == 'get')? $.param(params.data): JSON.stringify(params.data);
 			}
@@ -137,12 +144,9 @@ var API = function() {
 			output.isLoggedIn = function(params) {
 				var s = _getSession();
 				if(s.sessionID && s.authToken) {
-					_ajax({
-						type: 'get',
-						url: 'auth/validator',
-						success: params.success || null,
-						error: params.error || null
-					});
+					params.type = 'get';
+					params.url = 'auth/validator';
+					_ajax(params);
 				} else { params.error(); }
 				return s;
 			};
@@ -167,21 +171,11 @@ var API = function() {
 			};
 			return output;
 		},
-		resources: {
-			get: function(data) {
-				var params = _sanitize(data);
-				params.type = 'get';
-				params.url = 'posts/resources';
-				if(params.id) { params.url += '/'+params.id; }
-				params.data = $.param(params.data);
-				_ajax(params);
-			}
-		},
 		settings: function() {
 			return _generic('config');
 		},
-		assets: function() {
-			return _generic('posts/assets');
+		media: function() {
+			return _generic('posts/media');
 		},
 		users: function() {
 			return _generic('config/users');

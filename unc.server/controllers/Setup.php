@@ -357,7 +357,7 @@ class Setup extends UnCodr {
 				'emailVerified' => 1,
 				'status' => 1,
 				'group' => ['groupID' => $groupID[0], 'expiry' => null]
-			]], false);
+			]]);
 		}
 
 		# create 2 pages (home, about)

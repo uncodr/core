@@ -3,6 +3,7 @@
 class Auth extends UnCodr {
 
 	private $_sessFields = 'userID,email,login,screenName,name,emailVerified,addedOn';
+	private $_sessGroupFields = ['groupID','code','expiry','meta','permissions'];
 
 	public function __construct() {
 
@@ -21,8 +22,9 @@ class Auth extends UnCodr {
 
 		# if user is logged in (header's sessionID and authToken match)
 		if($this->authex->validateUser()) {
-			$this->exitCode = ($this->_checkLoginConfigs($this->session['userData']))? 204 : 401;
-			return false;
+			$this->exitCode = !($this->_checkLoginConfigs($this->session['userData']))? 401 :
+				($this->_checkAccess())? 204 : 403;
+			return null;
 		}
 
 		# post data must have username and password
@@ -64,12 +66,9 @@ class Auth extends UnCodr {
 			# create record in sessionTable
 			unset($user['ssoID'], $user['password'], $user['loginCount'], $user['status']);
 			$user['emailVerified'] = (bool) $user['emailVerified'];
-			$user = $this->_createSession($user, isset($post['remember']));
 
 			# send sessionID, authToken and data (name, email)
-			$data = array_merge($data, elements(['sessionID', 'authToken'], $user));
-			$data['data'] = elements(['name', 'email', 'screenName'], $user['userData']);
-			$this->apiResponse['data'] = $data;
+			$this->apiResponse = array_merge($data, $this->_createSession($user, false));
 		}
 	}
 
@@ -106,7 +105,7 @@ class Auth extends UnCodr {
 
 			# get user's groups
 			if(!isset($user['groups'])) {
-				$user['groups'] = $this->authex->getUserGroups($user['userID'], ['groupID','code','expiry','permissions']);
+				$user['groups'] = $this->authex->getUserGroups($user['userID'], $this->_sessGroupFields);
 			}
 
 			# if expired groups are to be denied
@@ -132,13 +131,22 @@ class Auth extends UnCodr {
 		return $isValid;
 	}
 
+	private function _checkAccess() {
+
+		$path = str_replace($this->baseURL,'',$this->agent->referrer());
+		if(strpos($path, 'admin') === 0) {
+			return !$this->authex->hasGroup('user');
+		}
+		return true;
+	}
+
 	/**
 	 * events to be triggered when the user logs in for the first time
 	 * see 'validator' method of this class
 	 * @param	array		$user			keys: fields in 'users' table
 	 * @return	bool
 	 */
-	private function _firstLogin($user) {
+	private function _firstLogin(&$user) {
 
 		# call segment's track
 		/*$this->analytics->track([
@@ -146,6 +154,7 @@ class Auth extends UnCodr {
 			'event' => 'Activated the Account'
 		]);
 		return true;*/
+		$user['firstLogin'] = true;
 		return ['firstLogin' => true];
 	}
 
@@ -185,7 +194,18 @@ class Auth extends UnCodr {
 			'userData' => $data,
 			'authToken' => md5(time())
 		];
-		return $this->authex->setSession($output, true, $persistent);
+		$headers = $this->authex->getSessionID(false);
+		if(isset($headers['sessionID'])) { $output['sessionID'] = $headers['sessionID']; }
+
+		$this->session = $this->authex->setSession($output, false, $persistent);
+		unset($output['userID'], $output['userData']);
+
+		# execute the hook
+		$this->runHook('auth/login', [$userID, $data]);
+
+		$output['sessionID'] = $this->session['sessionID'];
+		$output['data'] = elements(['name', 'email', 'screenName'], $this->session['userData']);
+		return $output;
 	}
 
 	/**
@@ -194,10 +214,13 @@ class Auth extends UnCodr {
 	 */
 	public function logout() {
 
-		$headers = $this->authex->checkHeaders();
+		$headers = $this->authex->getSessionID(false);
 		if($headers) {
 			$this->model->connect(null, false);
 			$this->authex->unsetSession($headers['sessionID']);
+
+			# execute the hook
+			$this->runHook('auth/logout');
 		}
 		$this->exitCode = 204;
 	}
@@ -215,10 +238,9 @@ class Auth extends UnCodr {
 		# then check whether registration is enabled
 		$permission = $this->authex->validateUser('users');
 		if(($permission === false) || !($permission & 2)) {
-			$conf = $this->siteConfigs(['registration']);
-			$conf['registration'] = json_decode($conf['registration'], true);
-			if($conf['registration']['enable'] == 0) { return false; }
-			$groups[] = $conf['registration']['default_group'];
+			$conf = $this->authex->getDefaultGroup(false);
+			if(!$conf) { return false; }
+			$groups[] = $conf['code'];
 			$permission = 0;
 		}
 
@@ -240,11 +262,10 @@ class Auth extends UnCodr {
 		# check whether user is already registered
 		$this->exitCode = 400;
 		$user = $this->authex->getUser([$post['email'], $post['login']], ['select' => 'userID, login']);
-		$l = count($user);
-		if($l) {
+		if(isset($user[0])) {
 			$this->apiResponse['error'] = ($user[0]['login'] == $post['login'])? 'login' : 'email';
 			$this->apiResponse['message'] = 'User \''.$post[$this->apiResponse['error']].'\' already exists.';
-			$this->exitCode = 404-$l;
+			$this->exitCode = 404-count($user);
 			return false;
 		}
 
@@ -267,7 +288,8 @@ class Auth extends UnCodr {
 			return false;
 		}
 
-		# modify $post['group'] such that groupID becomes the key and expiry timestamp is the value
+		# modify $post['group'] such that it has groupID and expiry timestamp
+		$post['groups'] = $post['group'];
 		$post['group'] = [];
 		foreach($groups as $gp) {
 			if(($gp['groupID'] != '1') || ($permission == 7)) {
@@ -276,44 +298,35 @@ class Auth extends UnCodr {
 		}
 
 		# if user session to be started
-		$autologin = ($post['autologin'] && $conf['registration']['autologin']);
+		$autologin = ($post['autologin'] && $conf['autologin']);
 		$post['autologin'] = $autologin;
 		if($autologin) {
-			$post['loginCount'] = 0;
+			$post['loginCount'] = 1;
 			$post['lastLogin'] = time();
 		}
 
 		# create user and get userID, otp & screenName
-		$user = $this->authex->createUser($post, true);
+		$user = $this->authex->createUser($post);
 
 		# if user created successfully
 		if(isset($user[0])) {
-			$hooks = $this->siteConfigs('hooks.auth');
-			$hooks = json_decode($hooks['hooks.auth'], true);
-			if(isset($hooks['register'])) {
-				switch(gettype($hooks['register'])) {
-					case 'string':
-						$hooks = [$hooks['register']];
-						break;
-					case 'array':
-						$hooks = $hooks['register'];
-						break;
-					default:
-						$hooks = [];
-						break;
-				}
-
-				// $this->apiResponse['hdata'] = [];
-				foreach($hooks as $hook) {
-					$hook =	explode('/',$hook);
-					$method = array_pop($hook);
-					$class = implode('_',$hook);
-					$this->load->library(implode('/', $hook), null, $class);
-					$this->{$class}->{$method}($user[0]['userID'], $post);
-					// array_push($this->apiResponse['hdata'], $this->{$class}->{$method}($user[0]['userID'], $post));
-				}
-			}
 			$this->exitCode = 201;
+
+			# execute the hook
+			$isHookExecuted = true;
+			$out = $this->runHook('auth/register', [$user[0]['userID'], $post]);
+			foreach ($out as $hook => $output) {
+				$isHookExecuted = ($isHookExecuted && $output['success']);
+			}
+
+			# email the verification link
+			if($isHookExecuted) {
+				$this->authex->emailOTP([
+					'name' => $post['name'],
+					'email' => $post['email'],
+					'otp' => $user[0]['otp']
+				], 'registration');
+			}
 
 			# start session
 			if($autologin) {
@@ -322,20 +335,15 @@ class Auth extends UnCodr {
 				$user = array_merge($post, $user[0]);
 				$user['emailVerified'] = false;
 				$user['addedOn'] = time();
-				$user['groups'] = $this->authex->getUserGroups($user['userID'], ['groupID','code','expiry','permissions']);
+				$user['groups'] = $this->authex->getUserGroups($user['userID'], $this->_sessGroupFields);
 
-				$data = $this->_firstLogin($user);
-				$user = $this->_createSession($user, false);
-
-				# send sessionID and authToken
-				$data = array_merge($data, elements(['sessionID', 'authToken'], $user));
-				$data['data'] = elements(['name', 'email', 'screenName'], $user['userData']);
-				$this->apiResponse['data'] = $data;
+				# send response
+				$this->apiResponse = array_merge($this->_firstLogin($user), $this->_createSession($user, false));
 			} else {
 				$this->apiResponse['data'] = [
 					'name' => $post['name'],
 					'email' => $post['email'],
-					'screenName' => $user['screenName']
+					'screenName' => $user[0]['screenName']
 				];
 			}
 		}
@@ -384,7 +392,7 @@ class Auth extends UnCodr {
 			$data = $this->authex->parseVcode($post['vcode'], false);
 			if(!$data) {
 				$this->exitCode = 401;
-				$this->apiResponse = ['message' => 'Link is invalid, please try again'];
+				$this->apiResponse = ['message' => 'Link is invalid, please try "forgot password" again'];
 				return null;
 			} else { $post = array_merge($post, $data); }
 		}
@@ -407,7 +415,7 @@ class Auth extends UnCodr {
 
 		# get the user by $post['user']
 		$select = 'password, otp, loginCount, ';
-		$select .= ($post['autologin'])? $this->_sessFields : 'userID, email';
+		$select .= ($post['autologin'])? $this->_sessFields : 'emailVerified, userID, email';
 		$user = $this->authex->getUser($post['user'], ['select' => $select]);
 
 		if(count($user) === 1) {
@@ -420,8 +428,13 @@ class Auth extends UnCodr {
 				return 401;
 			}
 
-			# set loginCount to 0 if user is verifying the email ID for the first time
+			# set loginCount to 0 if user is logging in for the first time
 			if($user['loginCount'] == null) { $user['loginCount'] = 0; }
+
+			# execute the hook
+			if(!$user['emailVerified']) {
+				$this->runHook('auth/emailVerified', [$user]);
+			}
 
 			# update otp, password and emailVerified
 			$this->authex->updateUser($user['userID'], [
@@ -434,16 +447,13 @@ class Auth extends UnCodr {
 			if(!$post['autologin']) { return 204; }
 			else {
 				$data = [];
-				$user['groups'] = $this->authex->getUserGroups($user['userID'], ['groupID','code','expiry','permissions']);
+				$user['groups'] = $this->authex->getUserGroups($user['userID'], $this->_sessGroupFields);
 				if($user['loginCount'] == 0) { $data = $this->_firstLogin($user); }
 
-				unset($user['otp'], $user['loginCount']);
-				$user = $this->_createSession($user, false);
+				unset($user['otp'], $user['loginCount'], $user['password']);
 
-				# send sessionID and authToken
-				$data = array_merge($data, elements(['sessionID', 'authToken'], $user));
-				$data['data'] = elements(['name', 'email', 'screenName'], $user['userData']);
-				$this->apiResponse['data'] = $data;
+				# send sessionID, authToken and data (name, email)
+				$this->apiResponse = array_merge($data, $this->_createSession($user, false));
 				return 200;
 			}
 		}

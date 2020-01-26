@@ -166,7 +166,7 @@ input[type="radio"], input[type="checkbox"], .radio, .checkbox { min-width: 0; w
 
 .btn.danger, .btn.btn-default.danger { color: #e53935; }
 
-.btn.btn-border, .btn.border { color: #2196f3; background-color: transparent; border-color: #2196f3; box-shadow: none; }
+.btn-border, .btn.border { color: #2196f3; background-color: transparent; border-color: #2196f3; box-shadow: none; }
 
 .btn.btn-default { color: rgba(38,50,56,0.7); background-color: #fff; }
 .btn.btn-default:hover { color: rgba(38,50,56,0.85); background-color: #f5f5f5; }

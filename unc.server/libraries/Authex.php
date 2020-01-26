@@ -80,7 +80,8 @@ class Authex extends Authex_session {
 			'fields' => [
 				'groupID' => sqlField('id-0'),
 				'userID' => sqlField('id-0'),
-				'expiry' => sqlField('epoch')
+				'expiry' => sqlField('epoch'),
+				'meta' => sqlField('longtext')
 			],
 			'pkeys' => ['groupID', 'userID'],
 			'keys' => ['userID'],
@@ -94,7 +95,7 @@ class Authex extends Authex_session {
 	public function validateUser($axn = null) {
 
 		# check whether sessionID and authToken in headers/cookies exist
-		$data = ($this->CI->isAPI)? $this->checkHeaders() : $this->checkCookies();
+		$data = $this->getSessionID();
 		if(!$data) { return false; }
 
 		# check whether session record exists
@@ -148,7 +149,7 @@ class Authex extends Authex_session {
 	 * @param	array		$param			[data => [email => '', login => '', password => ''], meta => [key => value]]
 	 * @return	array		keys: userID, otp, screenName
 	 */
-	public function createUser($param, $sendEmail = false) {
+	public function createUser($param) {
 
 		$out = [];
 		$time = time();
@@ -186,15 +187,6 @@ class Authex extends Authex_session {
 			if($out[$i]['userID']) {
 				if($meta) { $this->_addMeta('user', $out[$i]['userID'], $meta); }
 				if($group) { $this->updateUserGroup($out[$i]['userID'], ['add' => $group], []); }
-
-				# email the verification link
-				if($sendEmail) {
-					$this->_emailOTP([
-						'name' => $user['name'],
-						'email' => $user['email'],
-						'otp' => $user['otp']
-					], 'registration');
-				}
 				$out[$i]['otp'] = $user['otp'];
 				$out[$i]['screenName'] = $user['screenName'];
 			} else { unset($out[$i]); }
@@ -230,6 +222,7 @@ class Authex extends Authex_session {
 						'userID' => $userID,
 						'groupID' => $gID,
 						'expiry' => $value['expiry'],
+						'meta' => null,
 						'addedOn' => $time,
 						'lastUpdatedOn' => $time,
 						'status' => 1
@@ -278,6 +271,7 @@ class Authex extends Authex_session {
 
 		$meta = [];
 		foreach($data as $key => $value) {
+			if(gettype($value) != 'string') { $value = json_encode($value); }
 			array_push($meta, [
 				$tableID.'ID' => $pKey,
 				'key' => $key,
@@ -311,7 +305,7 @@ class Authex extends Authex_session {
 					'data' => ['otp' => $user['otp']]
 				], false);
 			}
-			$this->_emailOTP($user);
+			$this->emailOTP($user);
 		}
 		return $user;
 	}
@@ -321,13 +315,13 @@ class Authex extends Authex_session {
 	 * @param	array		$data			keys: name, email, otp
 	 * @return	boolean
 	 */
-	private function _emailOTP($data, $template = 'recover') {
+	public function emailOTP($data, $template = 'recover') {
 
 		$data['vcode'] = b64encode($data['email'].' | '.$data['otp']);
 		return $this->CI->sendMail([
 			'emailTemplate' => $template,
 			'data' => $data,
-			'subject' => ($template == 'recover')? 'OTP for Password reset' : 'Account Activation'
+			'subject' => ($template == 'recover')? 'OTP for Password reset: '.$data['otp'] : 'Account Activation'
 		]);
 	}
 
@@ -372,7 +366,7 @@ class Authex extends Authex_session {
 
 		if(!count($meta)) { return null; }
 
-		$metaOld = $this->getUserMeta($userID, array_keys($meta));
+		$metaOld = $this->CI->model->getMeta('users', ['where' => ['userID' => $userID, 'key' => array_keys($meta)]]);
 		$params = ['table' => 'users_meta', 'data' => []];
 		$remove = [];
 
@@ -406,6 +400,22 @@ class Authex extends Authex_session {
 		], $log);
 	}
 
+	public function deleteUser($userID, $log = true) {
+
+		$this->CI->model->delete([
+			'table' => 'users',
+			'where' => ['userID' => $userID]
+		], $log);
+		$this->CI->model->delete([
+			'table' => 'users_meta',
+			'where' => ['userID' => $userID]
+		], $log);
+		$this->CI->model->delete([
+			'table' => 'groups_users',
+			'where' => ['userID' => $userID]
+		], $log);
+	}
+
 	/**
 	 * get group by code
 	 * @param	string		$code			group code
@@ -421,27 +431,9 @@ class Authex extends Authex_session {
 		$param = ['table' => 'groups', 'select' => $fields, 'where' => []];
 		if($public) { $param['where'] = ['registration' => '1', 'status' => '1']; }
 
-		if(isset($identifier['code'])) {
-			# if $identifier is array, use where_in
-			switch(gettype($identifier['code'])) {
-				case 'array':
-					$param['where_in'] = ['code' => $identifier['code']];
-					break;
-				case 'string':
-					$param['where']['code'] = $identifier['code'];
-					break;
-			}
-		} elseif(isset($identifier['id'])) {
-			# if $identifier is array, use where_in
-			switch(gettype($identifier['id'])) {
-				case 'array':
-					$param['where_in'] = ['groupID' => $identifier['id']];
-					break;
-				case 'string':
-					$param['where']['groupID'] = $identifier['id'];
-					break;
-			}
-		} else { return []; }
+		if(isset($identifier['code'])) { $param = apiWhereByType($param, ['code' => $identifier['code']]); }
+		elseif(isset($identifier['id'])) { $param = apiWhereByType($param, ['groupID' => $identifier['id']]); }
+		else { return []; }
 
 		return $this->CI->model->get($param);
 	}
@@ -460,7 +452,7 @@ class Authex extends Authex_session {
 			case 'array':
 				$key = 'where_in';
 				break;
-			case 'string':
+			case 'string': case 'integer':
 				$key = 'where';
 				break;
 		}
@@ -498,10 +490,7 @@ class Authex extends Authex_session {
 			'select' => $this->_sanitizeGroupFields($fields),
 			'order_by' => ['groups_users.status' => 'DESC', 'groups_users.expiry' => 'DESC']
 		];
-		if(gettype($userID) == 'array') {
-			$param['where_in'] = ['groups_users.userID' => $userID];
-			$param['where'] = [];
-		} else { $param['where'] = ['groups_users.userID' => $userID]; }
+		$param = apiWhereByType($param, ['groups_users.userID' => $userID]);
 
 		if($active) {
 			$param['where']['groups_users.status'] = 1;
@@ -523,44 +512,36 @@ class Authex extends Authex_session {
 		return $this->CI->model->get($param);
 	}
 
-	public function getUserMeta($userID = null, $keys = true) {
+	public function getDefaultGroup($getGroupID = true) {
 
-		if(!$userID) { return []; }
-
-		$param = [
-			'table' => 'users_meta',
-			'where' => ['userID' => $userID],
-			'select' => 'key, value'
-		];
-		switch(gettype($keys)) {
-			case 'array':
-				$param['where_in'] = ['key' => $keys];
-				break;
-			case 'string':
-				$param['where']['key'] = $keys;
-				break;
+		$out = $this->CI->siteConfigs('registration');
+		$out['registration'] = json_decode($out['registration'], true);
+		if($out['registration']['enable'] == 0) { return null; }
+		$out = ['code' => $out['registration']['default_group'], 'autologin' => $out['registration']['autologin']];
+		if($getGroupID) {
+			$group = $this->CI->authex->getGroups(['code' => $out['code']], 'groupID, expiry', true);
+			$out = isset($group[0])? array_merge($out, $group[0]) : null;
 		}
-		$param = $this->CI->model->get($param);
-
-		return array_column($param, 'value', 'key');
+		return $out;
 	}
 
 	private function _sanitizeGroupFields($fields) {
 
 		if($fields == '*') {
-			$fields = 'groups_users.groupID, groups_users.userID, groups.code, groups.name, groups.permissions, groups_users.expiry, groups_users.status';
+			$fields = 'groups_users.groupID, groups_users.userID, groups.code, groups.name, groups.permissions, groups_users.expiry, groups_users.meta, groups_users.status';
 		} else {
 			$fields = array_flip($fields);
 
 			if(isset($fields['id'])) { $fields['groups_users.groupID as id'] = $fields['id']; }
 			if(isset($fields['groupID'])) { $fields['groups_users.groupID'] = $fields['groupID']; }
 			if(isset($fields['userID'])) { $fields['groups_users.userID'] = $fields['userID']; }
+			if(isset($fields['meta'])) { $fields['groups_users.meta'] = $fields['meta']; }
 			if(isset($fields['code'])) { $fields['groups.code'] = $fields['code']; }
 			if(isset($fields['name'])) { $fields['groups.name'] = $fields['name']; }
 			if(isset($fields['permissions'])) { $fields['groups.permissions'] = $fields['permissions']; }
 			if(isset($fields['expiry'])) { $fields['groups_users.expiry'] = $fields['expiry']; }
 			if(isset($fields['status'])) { $fields['groups_users.status'] = $fields['status']; }
-			unset($fields['id'], $fields['groupID'], $fields['userID'], $fields['code'], $fields['name'], $fields['permissions'], $fields['expiry'], $fields['status']);
+			unset($fields['id'], $fields['groupID'], $fields['userID'], $fields['meta'], $fields['code'], $fields['name'], $fields['permissions'], $fields['expiry'], $fields['status']);
 
 			asort($fields);
 			$fields = implode(',', array_flip($fields));
