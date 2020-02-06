@@ -7,7 +7,7 @@ var auth = {};
 		Core.block(panel);
 		API.auth().isLoggedIn({
 			success: function(r) {
-				window.location = next;
+				window.location.href = window.url.base+'/'+next;
 			},
 			error: function(r) {
 				API.auth().clearStorage();
@@ -19,7 +19,7 @@ var auth = {};
 		localStorage.setItem('sessionID', resp.sessionID);
 		localStorage.setItem('authToken', resp.authToken);
 		localStorage.setItem('data', JSON.stringify(resp.data));
-		window.location.href = next;
+		window.location.href = window.url.base+'/'+next;
 	},
 	formLogin = function(form, next) {
 		var data = Core.validateForm(form);
@@ -95,7 +95,7 @@ var auth = {};
 				toastr['success']('Password has been changed');
 				API.auth().clearStorage(true);
 				localStorage.setItem('logout', true);
-				window.setTimeout(function() { window.location.href = 'auth'; }, 500);
+				window.setTimeout(function() { window.location.href = window.url.base+'/auth'; }, 500);
 			}
 			data.error = function(r) {
 				toastr['error'](r.responseJSON.message);

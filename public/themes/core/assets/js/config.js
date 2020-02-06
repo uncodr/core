@@ -66,7 +66,6 @@
 			}
 			// check site visibility
 			params.is_crawlable = (params.is_crawlable == undefined)? 1 : 0;
-			console.log(params.email, oldConfig.email);
 			// check email settings
 			if(!params.email.host) { params.email = {}; }
 			else {

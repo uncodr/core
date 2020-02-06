@@ -32,7 +32,7 @@
 			<p class="hint">Database Username</p>
 			<label>
 				<span class="field-name">Password</span>
-				<input type="text" name="db_password" value="" required>
+				<input type="password" name="db_password" value="" required>
 			</label>
 			<p class="hint">Database Password</p>
 			<label>

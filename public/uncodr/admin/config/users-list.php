@@ -1,5 +1,5 @@
 		<div class="page-heading">
-			<input type="text" name="search" placeholder="Search" class="search">
+			<input type="text" name="search" placeholder="Search by Login Details" class="search">
 			<h1 class="dropdown">
 				<a href="admin/config/users" class="default"><?= $heading; ?> <i class="ion ion-arrow-down-b text sm"></i></a>
 				<ul class="content list-group h6">
@@ -9,14 +9,14 @@
 			</h1>
 			<a href="admin/config/users#new" class="btn sm">Add New</a>
 		</div>
+		<p class="search-title hidden"></p>
 		<ul class="list-inline toolbar">
 			<li class="btn-group bulk-axn hidden">
-				<a class="btn btn-red" data-action="trash"><i class="ion ion-trash-b"></i></a>
+				<a class="btn btn-red btn-remove" data-action="trash"><i class="ion ion-trash-b"></i></a>
 			</li>
 			<li class="btn-group filters"></li>
 			<li class="right pagination hidden"></li>
 		</ul>
-		<div class="search-title hidden"></div>
 		<table class="panel multi-row hover">
 			<thead>
 				<tr>
@@ -52,7 +52,7 @@
 		</table>
 		<ul class="list-inline toolbar">
 			<li class="btn-group bulk-axn hidden">
-				<a class="btn btn-red" data-action="trash"><i class="ion ion-trash-b"></i></a>
+				<a class="btn btn-red btn-remove" data-action="trash"><i class="ion ion-trash-b"></i></a>
 			</li>
 			<li class="btn-group filters"></li>
 			<li class="right pagination hidden"></li>

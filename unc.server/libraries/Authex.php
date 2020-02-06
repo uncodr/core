@@ -402,18 +402,16 @@ class Authex extends Authex_session {
 
 	public function deleteUser($userID, $log = true) {
 
-		$this->CI->model->delete([
-			'table' => 'users',
-			'where' => ['userID' => $userID]
-		], $log);
-		$this->CI->model->delete([
-			'table' => 'users_meta',
-			'where' => ['userID' => $userID]
-		], $log);
-		$this->CI->model->delete([
-			'table' => 'groups_users',
-			'where' => ['userID' => $userID]
-		], $log);
+		$params = apiWhereByType(['table' => 'users'], ['userID' => $userID]);
+		$this->CI->model->delete($params, $log);
+
+		$params['table'] = 'users_meta';
+		$this->CI->model->delete($params, $log);
+
+		$params['table'] = 'groups_users';
+		$this->CI->model->delete($params, $log);
+
+		return true;
 	}
 
 	/**

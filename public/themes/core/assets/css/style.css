@@ -193,7 +193,8 @@ input[type="radio"], input[type="checkbox"], .radio, .checkbox { min-width: 0; w
 
 /*______ List & List Elements ______*/
 .list-title { margin-bottom: 1.5rem; padding-bottom: .5rem; border-bottom: .1rem solid rgba(38,50,56,0.06); }
-.list-unstyled, .list-dashed, .list-input, .list-icons, .list-inline, .nav-tabs, .list-group, .alerts { margin-bottom: 0; padding-left: 0; list-style: none; }
+.list-nospace .list-title { margin-bottom: .8rem; }
+.list-unstyled, .list-dashed, .list-nospace, .list-input, .list-icons, .list-inline, .nav-tabs, .list-group, .alerts { margin-bottom: 0; padding-left: 0; list-style: none; }
 .list-dashed { padding-left: 1.3rem; }
 .list-dashed > li { position: relative; }
 .list-dashed > li::before { content: "-"; position: absolute; left: -1.3rem; top: 0; }

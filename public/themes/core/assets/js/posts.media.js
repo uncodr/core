@@ -127,5 +127,6 @@
 
 		initGallery();
 		galleryEvents();
+		admin.dropzone();
 	}
 })();

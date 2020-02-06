@@ -29,6 +29,36 @@
 		// ajax success function
 		data.success = function(r) {
 			_populateList({data: r.data, page: data.page, reset: resetTable});
+			/*admin.fillTable(tBody, r.data, {
+				reset: resetTable,
+				vars: {
+					status: {type: 'bool', key: 'publishedOn', is: null, val: ['Published', 'Last Updated']},
+					axn: {type: 'bool', key: 'publishedOn', is: null, valKey: ['publishedOn', 'lastUpdatedOn']},
+					axnDate: {type: 'epoch', key: 'axn', val: 'M d, Y'},
+					axnTime: {type: 'epoch', key: 'axn', val: 'H:i:s'},
+				},
+				classes: {s: 'page-'+data.page, d: ['st2']}
+			});*/
+			/*if(obj.data[i].publishedOn) {
+				status = 'published';
+				trHTML = trHTML.replace(/<li><a class="btn-status-change" data-status="3" data-id="{{id}}">Publish<\/a><\/li>|<li><a class="danger btn-delete" data-id="{{id}}">Delete Forever<\/a><\/li>/g,'');
+			} else {
+				if(obj.data[i].status == '0') {
+					obj.data[i].title += ' &mdash; Trash';
+					status = 'trash';
+					trHTML = trHTML.replace(/<li><a class="danger btn-status-change" data-status="0" data-id="{{id}}">Trash<\/a><\/li>/g,'');
+				} else {
+					obj.data[i].title += ' &mdash; Draft';
+					status = 'drafts';
+					trHTML = trHTML.replace('<li><a class="danger btn-delete" data-id="{{id}}">Delete Forever</a></li>','');
+				}
+			}
+			trTemp.addClass(status+' page-'+obj.page);
+			// if comments are disabled, then show lock icon
+			if(obj.data[i].commentStatus == '0') {
+				trHTML = trHTML.replace('<span class="chat-bubble">{{commentCount}}</span>', '<i class="ion lite ion-locked"></i>');
+			}*/
+
 			var history = window.history.state;
 			if(r.meta) {
 				_filterSetup(r.meta);
@@ -391,9 +421,9 @@
 				if (r.data.meta.thumbnail != undefined) {
 					post['meta[thumbnail]'].val(r.data.meta.thumbnail).attr('data-method', 'patch');
 					var dz = sections.edit.find('.dropzone');
-						dz.children('.placeholder').html('<img src="'+r.data.meta.thumbnail+'">');
-						dz.addClass('done');
-						dz.children(':input[name="dz-path"]').val(r.data.meta.thumbnail);
+					dz.children('.placeholder').html('<img src="'+r.data.meta.thumbnail+'">');
+					dz.addClass('done');
+					dz.children(':input[name="dz-path"]').val(r.data.meta.thumbnail);
 				} else {
 					post['meta[thumbnail]'].attr('data-method', 'put');
 				}
@@ -550,8 +580,6 @@
 			initPosts();
 			return false;
 		});
-
-		// dropzone
 	},
 	/* --- end: functions for adding/editing posts --- */
 	initPosts = function() {
@@ -638,6 +666,7 @@
 		tags.search('.tag-search', 'post');
 		Core.multiCheck();
 		Core.wysiwyg('.wysiwyg');
+		admin.dropzone();
 
 		// if history object changes
 		window.onpopstate = function(e) {

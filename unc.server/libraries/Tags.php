@@ -56,7 +56,7 @@ class Tags {
 
 		$param = [
 			'table' => 'tags',
-			'select' => 'tagID as id, tagName, tagType, relatedTo, description'
+			'select' => 'tagID as id, name, type, relatedTo, description'
 		];
 
 		# $param['limit'][0] contains pageSize & $param['limit'][1] contains page starting offset value
@@ -88,8 +88,8 @@ class Tags {
 	private function _countTags($param) {
 
 		$output = ['all' => 0 ];
-		$param['select'] = 'tagType, count(`tagType`) as count';
-		$param['group_by'] = 'tagType';
+		$param['select'] = 'type, count(`type`) as count';
+		$param['group_by'] = 'type';
 
 		unset($param['limit']);
 
@@ -98,10 +98,10 @@ class Tags {
 		foreach($count as $c) {
 			$c['count'] = (int) $c['count'];
 			$output['all'] += $c['count'];
-			if (!isset($output[$c['tagType']])) {
-				$output[$c['tagType']] = 0;
+			if (!isset($output[$c['type']])) {
+				$output[$c['type']] = 0;
 			}
-			$output[$c['tagType']] += $c['count'];
+			$output[$c['type']] += $c['count'];
 		}
 		return $output;
 	}
@@ -110,8 +110,8 @@ class Tags {
 
 		$post = json_decode($this->CI->input->raw_input_stream, true);
 		$post['addedOn'] = time();
-		$post['tagName'] = $post['tag_name'];
-		$post['tagType'] = $post['tag_type'];
+		$post['name'] = $post['tag_name'];
+		$post['type'] = $post['tag_type'];
 		$post['relatedTo'] = $post['related_to'];
 
 		unset( $post['tag_name'], $post['tag_type'], $post['related_to']);
@@ -130,8 +130,8 @@ class Tags {
 
 		$post = json_decode($this->CI->input->raw_input_stream, true);
 		$post['lastUpdatedOn'] = time();
-		$post['tagName'] = $post['tag_name'];
-		$post['tagType'] = $post['tag_type'];
+		$post['name'] = $post['tag_name'];
+		$post['type'] = $post['tag_type'];
 		$post['relatedTo'] = $post['related_to'];
 
 		unset( $post['tag_name'], $post['tag_type'], $post['related_to']);
@@ -167,7 +167,7 @@ class Tags {
 
 		if($this->CI->input->get()) {
 			if(isset($this->CI->input->get['fields'])) { $param['select'] = $this->CI->input->get['fields']; }
-			if(isset($this->CI->input->get['type'])) { $param['where'] = ['tagType' => $this->CI->input->get['type']]; }
+			if(isset($this->CI->input->get['type'])) { $param['where'] = ['type' => $this->CI->input->get['type']]; }
 		}
 
 		$data = $this->CI->model->get($param);
@@ -177,7 +177,7 @@ class Tags {
 
 	/************************Tags Search client & admin************************/
 	/**
-	 * Search Tags & Add/Delete Tags in tags_relation
+	 * Search Tags & Add/Delete Tags in tags_relations
 	 */
 	public function apiResource() {
 		if (!$this->CI->authex->validateUser()) {
@@ -218,7 +218,7 @@ class Tags {
 		$tableName = $this->_getTableName($getParams['type']);
 
 		$param = [
-			'table' => 'tags_relation',
+			'table' => 'tags_relations',
 			'where' => ['resourceID' => $resourceID, 'tableName' => $tableName]
 		];
 
@@ -227,9 +227,9 @@ class Tags {
 			$param['where_in'] = ['resourceID' => $resourceID];
 		}
 
-		if(isset($getParams['tagType'])){
-			$param['where']['tags.tagType'] = $getParams['tagType'];
-			$param['join'] = ['tags' => 'tags.tagID = tags_relation.tagID'];
+		if(isset($getParams['type'])){
+			$param['where']['tags.type'] = $getParams['type'];
+			$param['join'] = ['tags' => 'tags.tagID = tags_relations.tagID'];
 		}
 
 		if (isset($getParams['fields'])) {
@@ -239,7 +239,7 @@ class Tags {
 		}
 
 		if(strpos($param['select'], 'tags.') !== false && !isset($param['join']['tags'])) {
-			$param['join'] = ['tags' => 'tags.tagID = tags_relation.tagID'];
+			$param['join'] = ['tags' => 'tags.tagID = tags_relations.tagID'];
 		}
 
 		$data = $this->CI->model->get($param);
@@ -253,12 +253,9 @@ class Tags {
 		$select = array_flip($select);
 		$output = [];
 
-		if(isset($select['id'])) { $output['tags_relation.tagID as id'] = $select['id']; }
+		if(isset($select['id'])) { $output['tags_relations.tagID as id'] = $select['id']; }
 		if(isset($select['resourceID'])) { $output['resourceID'] = $select['resourceID']; }
-		if(isset($select['name'])) { $output['tags.tagName as name'] = $select['name']; }
 		if(isset($select['parent'])) { $output['tags.relatedTo as parent'] = $select['parent']; }
-		if(isset($select['type'])) { $output['tags.tagType as type'] = $select['type']; }
-		if(isset($select['description'])) { $output['tags.description'] = $select['description']; }
 		asort($output);
 		$output = array_flip($output);
 		return implode(',', $output);
@@ -291,7 +288,7 @@ class Tags {
 			}
 
 			$data = $this->CI->model->insertBatch([
-				'table' => 'tags_relation',
+				'table' => 'tags_relations',
 				'data' => $data
 			]);
 			if ($data) {
@@ -300,7 +297,7 @@ class Tags {
 		}
 	}
 
-	#  Delete tags in tags_relation
+	#  Delete tags in tags_relations
 	public function deleteResourceTags($resourceID, $getParams) {
 
 		if(!isset($getParams['type'])){
@@ -315,7 +312,7 @@ class Tags {
 		}
 
 		$data = $this->CI->model->delete([
-			'table' => 'tags_relation',
+			'table' => 'tags_relations',
 			'where' => $param
 		]);
 

@@ -18,17 +18,17 @@ var API = function() {
 			dataType: 'json',
 			headers: _getSession(),
 			type: params.type,
-			url: 'api/'+params.url,
+			url: window.url.base+'/api/'+params.url,
 			data: params.data || null,
 			success: function(r) {
 				if((r != undefined) && (r.sessionID != undefined)) { localStorage.setItem('sessionID', r.sessionID); }
 				params.success(r);
 			},
 			error: function(r) {
-				if(r.status == 401) { window.location.href = 'auth/logout'; }
-				else if(r.status == 403) { window.location.href = 'admin'; }
+				if(r.status == 401) { window.location.href = window.url.base+'/auth/logout'; }
+				else if(r.status == 403) { window.location.href = window.url.base+'/admin'; }
 				else if(params.error) { params.error(r); }
-				else { toastr['error'](r.responseJSON.message); }
+				else if(r.responseJSON != undefined && r.responseJSON.message != undefined) { toastr['error'](r.responseJSON.message); }
 			},
 			complete: params.complete || null
 		};
@@ -134,7 +134,7 @@ var API = function() {
 						toastr['success']('You have been logged out');
 						API.auth().clearStorage(true);
 						localStorage.setItem('logout', true);
-						window.setTimeout(function() { window.location.href = 'auth'; }, 500);
+						window.setTimeout(function() { window.location.href = window.url.base+'/auth'; }, 500);
 					}
 				});
 			};

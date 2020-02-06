@@ -96,6 +96,9 @@ class Config extends UnCodr {
 			case 'patch':
 				$this->apiResponse = $this->_patchUsers($userID);
 				break;
+			case 'delete':
+				$this->apiResponse = $this->_deleteUsers($userID);
+				break;
 		}
 	}
 
@@ -165,12 +168,11 @@ class Config extends UnCodr {
 		if($getMeta) {
 			$meta = [];
 
-			# fetch user's meta data and permission
+			# fetch user's meta data
 			if($userID) {
 				if($getMeta == 'true') { $getMeta = true; }
 				else { $getMeta = json_decode($getMeta, true); }
 				$meta = $this->model->getMeta('users', ['where' => ['userID' => $userID, 'key' => $getMeta]]);
-				$meta['_'] = $this->_permission;
 			}
 
 			# fetch page size and users' count
@@ -180,9 +182,10 @@ class Config extends UnCodr {
 					$meta['count'] = $this->_countUsers($param2);
 				}
 			}
-			$this->exitCode = 200;
+
+			$meta['_'] = $this->_permission;
 		}
-		if(count($data)) {
+		if(isset($data[0])) {
 			if($userID) { $data = $data[0]; }
 			if($select['groups']) {
 				$param2 = ($userID)? $userID : array_column($data, 'id');
@@ -298,6 +301,7 @@ class Config extends UnCodr {
 				}
 
 				# update details in 'users' table
+				if(isset($post['password'])) { $post['password'] = password_hash($post['password'], PASSWORD_BCRYPT, ['cost' => 10]); }
 				$post['lastUpdatedOn'] = $time;
 				$output = $this->authex->updateUser($userID, $post, $data['hasLogin']);
 				if($output) { $this->exitCode = 204; }
@@ -317,7 +321,7 @@ class Config extends UnCodr {
 					if(!$group) { unset($param[$key]); }
 					else {
 						foreach($group as $gp) {
-							if((($gp['id'] == 1) || ($gp == 1)) && !isset($myGroups[1])) {
+							if(((isset($gp['id']) && $gp['id'] == 1) || ($gp == 1)) && !isset($myGroups[1])) {
 								$this->exitCode = 403;
 								return ['message' => 'You do not have access of \'Administrator\' group'];
 							}
@@ -357,7 +361,7 @@ class Config extends UnCodr {
 					break;
 				case 'emailVerified': case 'status':
 					$post[$key] = (int) $value;
-				case 'name':
+				case 'name': case 'password':
 					break;
 				default:
 					unset($post[$key]);
@@ -392,5 +396,24 @@ class Config extends UnCodr {
 			}
 		}
 		return $error;
+	}
+
+	private function _deleteUsers($userIDs) {
+
+		# if the user does not have permission to DELETE users
+		if(!($this->_permission & 4)) {
+			$this->exitCode = 403;
+			return null;
+		}
+		if(!$userIDs) {
+			$this->exitCode = 404;
+			return null;
+		}
+
+		$userIDs = explode('-', $userIDs);
+		if(!isset($userIDs[1])) { $userIDs = $userIDs[0]; }
+		$this->exitCode = ($this->authex->deleteUser($userIDs))? 204:404;
+
+		$this->runHook('users/delete', [$userIDs]);
 	}
 }

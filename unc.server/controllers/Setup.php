@@ -272,6 +272,26 @@ class Setup extends UnCodr {
 				],
 				'keys' => ['title', 'mimeType', 'addedOn']
 			],
+			'tag' => [
+				'id' => 'tag',
+				'fields' => [
+					'name' => sqlField('var63'),
+					'type' => sqlField('var31'),
+					'description' => sqlField('text'),
+					'relatedTo' => sqlField('id-n'),
+					'addedOn' => sqlField('epoch')
+				],
+				'keys' => ['type', 'relatedTo']
+			],
+			'tags_relation' => [
+				'fields' => [
+					'tagID' => sqlField('id-0'),
+					'tableName' => sqlField('varchar', 31, ['default' => 'posts']),
+					'resourceID' => sqlField('id-0')
+				],
+				'pkeys' => ['tagID', 'tableName', 'resourceID'],
+				'keys' => ['tableName', 'resourceID']
+			],
 			'log' => [
 				'id' => 'log',
 				'fields' => [

@@ -401,7 +401,7 @@ var Core = function() {
 					var redirect = form.attr('data-redirect');
 					if(redirect) {
 						if(redirect.substring(0,1) != '/') { redirect = '/'+redirect; }
-						window.location = window.url.base+redirect;
+						window.location.href = window.url.base+redirect;
 					}
 					else {
 						toastr['success']('Form submitted successfully.');

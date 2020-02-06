@@ -69,11 +69,29 @@
 							</div>
 							<div class="col m-12 text-center"><button class="btn btn-save" type="submit">Save</button></div>
 						</form>
-						<ul class="list-group user-groups row">
-							<li class="title row bold">
+						<p class="bold margin2"><a class="edit-pwd">Change Password</a></p>
+						<form class="row user-pwd margin2" style="display: none;">
+							<div class="col m-6">
+								<label class="margin">
+									<span class="field-name">New Password</span>
+									<input type="password" name="password" value="" required>
+								</label>
+							</div>
+							<div class="col m-6">
+								<label class="margin">
+									<span class="field-name">Confirm</span>
+									<input type="text" name="password2" value="" required>
+								</label>
+							</div>
+							<div class="col m-12 text-center">
+								<span class="btn-group"><button class="btn btn-save" type="submit">Save</button><button class="btn btn-default edit-pwd">Cancel</button></span>
+							</div>
+						</form>
+						<ul class="list-nospace user-groups">
+							<li class="list-title row bold">
 								<div class="col m-6">Groups <a class="btn sm group-add">Add</a></div>
-								<div class="col m-2 hidden-xs hidden-s">Expiry</div>
-								<div class="col m-4 hidden-xs hidden-s">Status</div>
+								<div class="col m-2 hidden-xs hidden-s hidden-sm">Expiry</div>
+								<div class="col m-4 hidden-xs hidden-s hidden-sm">Status</div>
 							</li>
 							<li class="add row border-bottom" style="display: none;">
 								<div class="col m-6">
@@ -116,8 +134,7 @@
 					</div>
 					<footer class="default">
 						<ul class="list-inline spaced">
-							<li class="bold"><a href="">Change Password</a></li>
-							<li class="bold"><a href="">Email Password Reset Link</a></li>
+							<li class="bold"><a class="reset-pwd">Email Password Reset Link</a></li>
 							<li class="right"><span class="prompt solid">Public</span> denotes publically visible info.</li>
 						</ul>
 					</footer>
@@ -126,7 +143,7 @@
 			<div class="col s-4 ml-3">
 				<div class="img-placeholder"></div>
 				<div class="row">
-					<div class="col xs-12 s-6 sm-12 post-status">
+					<div class="col xs-12 s-6 sm-12">
 						<p class="label"><?= substr($heading, 0, -1); ?> Settings<a class="settings-link pull-right">Edit</a></p>
 						<div class="panel">
 							<div class="body summary">

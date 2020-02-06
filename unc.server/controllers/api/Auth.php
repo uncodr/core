@@ -315,8 +315,10 @@ class Auth extends UnCodr {
 			# execute the hook
 			$isHookExecuted = true;
 			$out = $this->runHook('auth/register', [$user[0]['userID'], $post]);
-			foreach ($out as $hook => $output) {
-				$isHookExecuted = ($isHookExecuted && $output['success']);
+			if($out) {
+				foreach($out as $hook => $output) {
+					$isHookExecuted = ($isHookExecuted && $output['success']);
+				}
 			}
 
 			# email the verification link

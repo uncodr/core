@@ -5,8 +5,8 @@
 <?php $this->load->view('uncodr/admin/config/users-edit'); ?>
 	</section>
 	<div class="user-add modal hidden" data-persist="1">
-		<a href="admin/config/users#status:all" class="btn circle lg modal-close">Close</a>
 		<div class="content panel">
+			<a href="admin/config/users#status:all" class="btn btn-red circle lg modal-close"><i class="ion ion-close-round"></i></a>
 			<header>
 				<h3 class="title">Add User</h3>
 			</header>
@@ -28,7 +28,7 @@
 							<input type="text" name="name" class="full" value="" required>
 						</label>
 						<label>
-                            <span class="field-name">Group</span>
+              <span class="field-name">Group</span>
 							<span class="select full"><select name="group" required>
 								<option value="" selected="selected" disabled="disabled">Select group to assign</option>
 <?php foreach ($groups as $group) { ?>

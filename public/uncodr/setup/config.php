@@ -11,7 +11,7 @@
 			<p class="hint">Admin to manage <?= APP_NAME; ?></p>
 			<label>
 				<span class="field-name">Password</span>
-				<input type="text" name="password" value="" required>
+				<input type="password" name="password" value="" required>
 			</label>
 			<p class="hint">Admin Password</p>
 			<label>

@@ -49,6 +49,14 @@ class Model extends CI_Model {
 				return $this->_onConnectionError($reset);
 			}
 
+			/*try {
+				$this->load->database();
+				if(!$this->db->conn_id) { throw new Exception(); }
+				else { return true; }
+			} catch (Exception $e) {
+				return $this->_onConnectionError($reset);
+			}*/
+
 			$this->load->database();
 			return (!$this->db->conn_id)? $this->_onConnectionError($reset) : true;
 		}
@@ -369,7 +377,12 @@ class Model extends CI_Model {
 
 		# use where or where_in depending on which key exists in $param
 		if(isset($param['where'])) { $this->db->where($param['where']); }
-		if(isset($param['where_in'])) { $this->db->where_in($param['where_in']); }
+		if(isset($param['where_in'])) {
+			foreach($param['where_in'] as $key => $value) {
+				$value = json_encode($value);
+				$this->db->where($key.' IN ('.substr($value, 1, -1).')');
+			}
+		}
 
 		# delete and return number of affected rows
 		$this->db->delete($param['table']);
