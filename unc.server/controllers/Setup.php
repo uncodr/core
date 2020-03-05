@@ -308,6 +308,7 @@ class Setup extends UnCodr {
 				'fields' => [
 					'key' => sqlField('var31'),
 					'value' => sqlField('text'),
+					'type' => sqlField('var15'),
 					'autoload' => sqlField('status')
 				],
 				'keys' => ['key', 'autoload']
@@ -324,7 +325,7 @@ class Setup extends UnCodr {
 			'table' => 'configs',
 			'where' => ['key' => 'siteTitle'],
 			'data' => [
-				['key' => 'siteTitle', 'value' => $data['title'], 'autoload' => 1]
+				['key' => 'siteTitle', 'value' => $data['title'], 'type' => 'str', 'autoload' => 1]
 			]
 		];
 		$result = $this->model->get($param);
@@ -339,20 +340,20 @@ class Setup extends UnCodr {
 		else {
 			$param['data'] = [
 				$param['data'][0],
-				['key' => 'homepage', 'value' => 'blog', 'autoload' => 1],
-				['key' => 'siteAdmin', 'value' => $data['email'], 'autoload' => 1],
-				['key' => 'isCrawlable', 'value' => '0', 'autoload' => 1],
-				['key' => 'timezone', 'value' => date('Z'), 'autoload' => 1],
-				['key' => 'dateFormat', 'value' => 'F d, Y', 'autoload' => 1],
-				['key' => 'timeFormat', 'value' => 'H:i:s', 'autoload' => 1],
-				['key' => 'permaLinks', 'value' => ':slug', 'autoload' => 1],
-				['key' => 'theme', 'value' => 'earth', 'autoload' => 1],
-				['key' => 'login', 'value' => '{"unverified_limit":0,"disable_on_expiry":1}', 'autoload' => 0],
-				['key' => 'registration', 'value' => '{"enable":0,"autologin":1,"default_group":"user"}', 'autoload' => 0],
-				['key' => 'comments', 'value' => '{"enable":0,"sort":"DESC","author_info":1,"public":0,"moderation":1,"autoclose":0}', 'autoload' => 0],
-				['key' => 'email', 'value' => '{}', 'autoload' => 0],
-				['key' => 'blogCount', 'value' => '12', 'autoload' => 0],
-				['key' => 'notification', 'value' => '[]', 'autoload' => 0]
+				['key' => 'homepage', 'value' => 'blog', 'type' => 'str', 'autoload' => 1],
+				['key' => 'siteAdmin', 'value' => $data['email'], 'type' => 'str', 'autoload' => 1],
+				['key' => 'isCrawlable', 'value' => '0', 'type' => 'int', 'autoload' => 1],
+				['key' => 'timezone', 'value' => date('Z'), 'type' => 'str', 'autoload' => 1],
+				['key' => 'dateFormat', 'value' => 'F d, Y', 'type' => 'str', 'autoload' => 1],
+				['key' => 'timeFormat', 'value' => 'H:i:s', 'type' => 'str', 'autoload' => 1],
+				['key' => 'permaLinks', 'value' => ':slug', 'type' => 'str', 'autoload' => 1],
+				['key' => 'theme', 'value' => 'earth', 'type' => 'str', 'autoload' => 1],
+				['key' => 'login', 'value' => '{"unverified_limit":0,"disable_on_expiry":1}', 'type' => 'json', 'autoload' => 0],
+				['key' => 'registration', 'value' => '{"enable":0,"autologin":1,"default_group":"user"}', 'type' => 'json', 'autoload' => 0],
+				['key' => 'comments', 'value' => '{"enable":0,"sort":"DESC","author_info":1,"public":0,"moderation":1,"autoclose":0}', 'type' => 'json', 'autoload' => 0],
+				['key' => 'email', 'value' => '{}', 'type' => 'json', 'autoload' => 0],
+				['key' => 'blogCount', 'value' => '12', 'type' => 'int', 'autoload' => 0],
+				['key' => 'notification', 'value' => '[]', 'type' => 'json', 'autoload' => 0]
 			];
 			$this->model->insertBatch($param);
 		}

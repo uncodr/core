@@ -195,8 +195,20 @@ var admin = function() {
 							d[k] = (d[key] == v.is)? d[v.valKey[0]] : d[v.valKey[1]];
 						}
 						break;
-					case 'epoch': d[k] = Core.getDate(d[key], v.val); break;
+					case 'epoch': d[k] = Core.helpers.getDate(d[key], v.val); break;
 					case 'int': d[k] = (d[key])? parseInt(d[key]):0; break;
+					case 'type': d[k] = Core.helpers.getType(d[key]); break;
+					case 'stringify':
+						switch(Core.helpers.getType(d[key])) {
+							case 'obj': case 'arr': d[k] = JSON.stringify(d[key]); break;
+							case 'bool':
+								d[k] = '<i class="ion ion-';
+								d[k] += (d[key])? 'ios-checkmark-empty':'ios-close-empty';
+								d[k] += '"></i>';
+								break;
+							default: d[k] = d[key]; break;
+						}
+						break;
 					case 'array':
 						var temp = d[key];
 						for (var j = 0, m = temp.length; j < m; j++) {
@@ -205,16 +217,28 @@ var admin = function() {
 						d[k] = temp.join(v.glue);
 						break;
 				}
+				if(v.prepend !== undefined) { d[k] = v.prepend+d[k]; }
 			});
 		}
-		var classes = [];
+		var out = {html: html.replaceMoustache(d), classes: [], attrs: []};
 		if(conf.classes != undefined) {
-			if(conf.classes.s != undefined) { classes = classes.concat(conf.classes.s.split(' ')); }
-			if(conf.classes.d != undefined) { classes = classes.concat($.map(conf.classes.d, function(v) { return d[v]; })); }
+			if(conf.classes.s != undefined) { out.classes = out.classes.concat(conf.classes.s.split(' ')); }
+			if(conf.classes.d != undefined) { out.classes = out.classes.concat($.map(conf.classes.d, function(v) { return d[v]; })); }
 		}
-		return {html: html.replaceMoustache(d), classes: classes};
+		if(conf.attrs != undefined) {
+			out.attrs = $.map(conf.attrs, function(v) { return {key: v, value: d[v]}; });
+		}
+		return out;
 	},
-	fillForm = function(el, data) {
+	fill = function(el, data, conf) {
+		var out = _fill(el.html(), data, conf);
+		el.html(out.html);
+		if(out.classes.length) { el.addClass(out.classes.join(' ')); }
+		if(out.attrs.length) {
+			for (var j = out.attrs.length - 1; j >= 0; j--) {
+				el.attr('data-'+out.attrs[j].key, out.attrs[j].value);
+			}
+		}
 	};
 
 	return {
@@ -229,16 +253,14 @@ var admin = function() {
 		checkSession: function() { checkSession(true); },
 		dropzone: function() { dropzone(); },
 		fillTable: function(el, data, conf = {}) {
-			var template = el.children('tr.template').eq(0), trTemp, out;
+			var template = el.children('tr.template').eq(0), trTemp;
 			if(conf.reset == undefined) { conf.reset = false; }
 			if(conf.reset) { el.children(':not(.template, .placeholder)').remove(); }
 			el.children().addClass('hidden');
 			for(var i = 0, l = data.length; i < l; i++) {
 				trTemp = template.clone();
 				trTemp.removeClass('hidden template');
-				out = _fill(template.html(), data[i], conf);
-				trTemp.html(out.html);
-				if(out.classes.length) { trTemp.addClass(out.classes.join(' ')); }
+				fill(trTemp, data[i], conf);
 				el.append(trTemp);
 			}
 		},
@@ -247,9 +269,7 @@ var admin = function() {
 				var el = $(this);
 				el.html('{{'+el.attr('data-name')+'}}');
 			});
-			var out = _fill(el.html(), data, conf);
-			el.html(out.html);
-			if(out.classes.length) { el.addClass(out.classes.join(' ')); }
+			fill(el, data, conf);
 		},
 		resetMultiCheck: function() {
 			var checks = $('main .multicheck.all');

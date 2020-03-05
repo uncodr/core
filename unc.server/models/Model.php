@@ -233,7 +233,7 @@ class Model extends CI_Model {
 		if(isAssoc($param['data'])) { return $this->_insertSingle($param['table'], $param['data']); }
 
 		# call _insertSingle() method for each $param['data']'s offset
-		else {
+		elseif(gettype($param['data']) == 'array') {
 			$output = [];
 			foreach($param['data'] as $i => $value) {
 				$output[$i] = $this->_insertSingle($param['table'], $value);
@@ -526,24 +526,6 @@ class Model extends CI_Model {
 	}
 
 	/**
-	 * create meta table in db
-	 */
-	private function _createTableMeta($tableName = '', $id = '') {
-
-		$id = $id.'ID';
-		$table = [
-			'fields' => [
-				$id => sqlField('id-0'),
-				'key' => sqlField(),
-				'value' => sqlField('text')
-			],
-			'pkeys' => [$id, 'key'],
-			'keys' => ['key']
-		];
-		return $this->createTable($tableName, $table, false);
-	}
-
-	/**
 	 * append default fields in the table Structure
 	 * @param	array		$structure		keys: id, fields, pkeys, keys, hasDefaults (optional)
 	 * @return	array		modified structure without 'hasDefaults' key
@@ -571,18 +553,67 @@ class Model extends CI_Model {
 		return $structure;
 	}
 
+	/**
+	 * create meta table in db
+	 */
+	private function _createTableMeta($tableName = '', $id = '') {
+
+		$id = $id.'ID';
+		$table = [
+			'fields' => [
+				$id => sqlField('id-0'),
+				'key' => sqlField(),
+				'value' => sqlField('text'),
+				'type' => sqlField('var15')
+			],
+			'pkeys' => [$id, 'key'],
+			'keys' => ['key']
+		];
+		return $this->createTable($tableName, $table, false);
+	}
+
 	public function getMeta($table, $params) {
 
+		$rawData = isset($params['raw'])? $params['raw'] : false;
 		$params = elements(['where','limit','getID'], $params);
 		if(!$params['where']) { return []; }
 
 		# prepare query parameters
-		$param = apiWhereByType(['table' => $table.'_meta', 'select' => 'key, value'], $params['where']);
+		$param = apiWhereByType(['table' => $table.'_meta', 'select' => 'key, value, type'], $params['where']);
 		if($params['limit']) { $param['limit'] = apiGetOffset($params['limit']); }
 		if($params['getID']) { $param['select'] = '*'; }
 
 		$data = $this->get($param, false);
-		return (!isset($data[0]))? [] : (!$params['getID']? array_column($data, 'value', 'key') : $data);
+		$out = [];
+		if(isset($data[0])) {
+			if($rawData) { return $data; }
+
+			# if id is not to be fetched, then return as associative array,
+			# else return as array
+			if(!$params['getID']) {
+				foreach ($data as $val) {
+					$out[$val['key']] = $this->_parseMetaValue($val['value'], $val['type']);
+				}
+			} else {
+				foreach ($data as $i => $val) {
+					$val['value'] = $this->_parseMetaValue($val['value'], $val['type']);
+					$out[$i] = $val;
+				}
+			}
+		}
+
+		return $out;
+	}
+
+	private function _parseMetaValue($value, $type) {
+
+		switch ($type) {
+			case 'obj': case 'arr': return json_decode($value, true);
+			case 'int': return (int) $value;
+			case 'num': return (float) $value;
+			case 'bool': return (bool) $value;
+			default: return $value;
+		}
 	}
 
 	public function countMeta($table, $where) {
@@ -614,24 +645,27 @@ class Model extends CI_Model {
 	 *											 		]
 	 *											 ]
 	 */
-	public function putMeta($table, $data = []) {
+	public function insertMeta($table, $data = []) {
 
 		if(!isset($data['data'])) { return null; }
 
 		$tempData = $data['data'];
-		unset($data['data']);
+		$type = (isset($data['type']))? $data['type'] : 'str';
+		unset($data['data'], $data['type']);
 		$out = [];
 
 		if(isAssoc($tempData)) {
 			foreach ($tempData as $key => $value) {
 				$data['key'] = $key;
 				$data['value'] = $value;
+				$data['type'] = $type;
 				array_push($out, $data);
 			}
-		} else {
+		} elseif(gettype($tempData) == 'array') {
 			foreach ($tempData as $val) {
 				$data['key'] = $val['key'];
 				$data['value'] = $val['value'];
+				$data['type'] = isset($val['type'])? $val['type'] : $type;
 				array_push($out, $data);
 			}
 		}
@@ -642,7 +676,7 @@ class Model extends CI_Model {
 		]);
 	}
 
-	public function patchMeta($table, $data = []) {
+	public function updateMeta($table, $data = []) {
 
 		if(!isset($data['data'])) { return null; }
 
@@ -677,13 +711,14 @@ class Model extends CI_Model {
 
 		# prepare query parameters
 		$param = ['table' => $table.'_meta', 'where' => []];
+		$param = apiWhereByType($param, $where);
 
-		# if $where['key'] is array, use 'where_in', if string or integer, use 'where'
+		/*# if $where['key'] is array, use 'where_in', if string or integer, use 'where'
 		if(isset($where['key'])) {
 			$param = apiWhereByType($param, ['key' => $where['key']]);
 			unset($where['key']);
 		}
-		$param['where'] = array_merge($param['where'], $where);
+		$param['where'] = array_merge($param['where'], $where);*/
 
 		return $this->_delete($param);
 	}

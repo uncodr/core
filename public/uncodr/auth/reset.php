@@ -3,8 +3,11 @@
 	<div class="panel">
 		<header><h2 class="title text-center"><?= $heading; ?></h2></header>
 		<form class="recover body hidden">
-			<p>An otp will be emailed to you, after which you can reset your password. Enter your Email ID or Username to continue.</p>
-			<input type="text" name="user" value="" required><br>
+			<p>An <strong>otp will be emailed</strong> to you, after which you can reset your password.</p>
+			<label>
+				<span class="field-name">Username or Email ID</span>
+				<input type="text" name="user" value="" required>
+			</label>
 			<a href="auth" class="alt-link">Back to Login</a>
 			<button type="submit" class="btn btn-submit">Submit</button>
 		</form>

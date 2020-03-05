@@ -155,7 +155,7 @@
 		var inputTime = form.find('input[name="time_format"]:checked');
 		var el = form.find('span.dt-sample');
 		el.text(
-			Core.getDate(el.attr('data-value'), inputDate.val() + ' - ' + inputTime.val())
+			Core.helpers.getDate(el.attr('data-value'), inputDate.val() + ' - ' + inputTime.val())
 		);
 	},
 	// date, time and timezone settings

@@ -86,9 +86,17 @@ body.admin > aside.left, body.admin > aside.left .ion+span { transition: all 400
     }
 }
 
-body.admin table.meta-table .select, body.admin table.meta-table input { margin-bottom: 0; }
-body.admin table.meta-table th:first-child { width: 25%; }
-body.admin table.meta-table th:last-child { width: 16rem; }
+body.admin table.meta-table .select, body.admin table.meta-table input.full { margin: -.8rem -1.1rem; }
+body.admin table.meta-table .btn-save-all { position: absolute; top: .2rem; left: .2rem; }
+body.admin table.meta-table th:first-child, body.admin table.meta-table td:first-child { width: 20%; }
+body.admin table.meta-table th:last-child, body.admin table.meta-table td:last-child { width: 14.4rem; padding: .2rem; }
+body.admin table.meta-table tbody .btn { width: 1.9rem; }
+body.admin table.meta-table .hellip { max-width: 40rem; }
+body.admin table.meta-table .btn-group { float: right; }
+body.admin table.meta-table tr.child > td { padding: 1rem 3rem; }
+body.admin table.meta-table tr.child > td > .clearfix { margin-left: -1.7rem; }
+body.admin table.meta-table tr.child > td > .clearfix .btn-group { margin: -.8rem -2.8rem .2rem; }
+body.admin table.meta-table tr.child > td > table { margin-bottom: -.8rem; }
 
 /* Posts Add/Edit */
 body.admin .process-post .post-permalink { display: inline-block; }

@@ -139,9 +139,6 @@
 						</ul>
 					</footer>
 				</div>
-				<div class="user-meta">
-<?php $this->load->view('uncodr/admin/meta'); ?>
-				</div>
 			</div>
 			<div class="col s-4 ml-3">
 				<div class="img-placeholder"></div>

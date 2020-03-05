@@ -358,7 +358,8 @@ var Core = function() {
 			}
 		});
 		// return (valid)? form.serialize().jsonify('&', '=') : null;
-		return (valid)? $(form).serializeArray().postify() : null;
+		var data = (valid)? $(form).serializeArray().postify() : null;
+		return data;
 	},
 	_updateJsonField = function(el, data, key) {
 		$.each(data, function(k, v) {
@@ -477,6 +478,136 @@ var Core = function() {
 			out[i] = String.fromCharCode(randomInt(33,126));
 		}
 		return out;
+	},
+	helpers = {
+		getType: function(val) {
+			var types = {Object: 'obj', Integer: 'int', String: 'str', Array: 'arr', Boolean: 'bool', Float: 'num'},
+				t = Object.prototype.toString.call(val).replace(/\[object\s(\w+)\]/g, "$1");
+			if(t == 'Number') { t = (val%1===0)? 'Integer':'Float'; }
+			return types[t];
+		},
+		parse: function(val, type) {
+			switch(type) {
+				case 'obj': case 'arr': return JSON.parse(val);
+				case 'int': return parseInt(val);
+				case 'num': return parseFloat(val);
+				case 'bool': return (val == 'true')? true: ((val == 'false')? false : !!val);
+				default: return val;
+			}
+		},
+		unparse: function(val) {
+			switch(helpers.getType(val)) {
+				case 'obj': case 'arr': return JSON.stringify(val);
+				case 'bool': return (val)? 'true': 'false';
+				default: return val+'';
+			}
+		},
+		obj2Epoch: function(obj, centuryNum) {
+			var F = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+				l = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+				keys = ['Y', 'n', 'j', 'G', 'i', 's'], out = {}, dt = new Date();
+
+			out.Y = dt.getFullYear();
+			out.n = dt.getMonth();
+			out.j = dt.getDate();
+			out.G = 23;
+			out.i = 59;
+			out.s = 59;
+			/*out.G = dt.getHours();
+			out.i = dt.getMinutes();
+			out.s = dt.getSeconds();*/
+			$.each(obj, function(k, v) {
+				if((k != 'a') && (k != 'A')) { v = parseInt(v); }
+				if(k == 'n') { out.n = v-1; }
+				else if(keys.indexOf(k) != -1) { out[k] = v; }
+				else {
+					switch(k) {
+						case 'd': out.j = v; break;
+						case 'F':
+							var key = F.indexOf(v);
+							if(key != -1) { out.n = key; }
+							break;
+						case 'M':
+							var M = [];
+							for (var i = F.length - 1; i >= 0; i--) { M[i] = F[i]; }
+							var key = M.indexOf(v);
+							if(key != -1) { out.n = key; }
+							break;
+						case 'm': out.n = v-1; break;
+						case 'y':
+							if(!centuryNum) { centuryNum = Math.floor(out.Y/100); }
+							out.Y = centuryNum*100 + v;
+							break;
+						case 'g': case 'h':
+							var pm = (obj.a || obj.A);
+							if(pm != undefined) {
+								out.G = v;
+								if(v < 12 && pm.toLowerCase() == 'pm') { out.G += 12; }
+							}
+							break;
+						case 'H': out.G = v; break;
+						case 'w': case 'l': case 'D': break;
+					}
+				}
+			});
+			return (new Date(out.Y, out.n, out.j, out.G, out.i, out.s)).getTime() / 1000;
+		},
+		parseDate: function(str, format, centuryNum) {
+			if(!str || !format) { return null; }
+			var reg = /[^\w\d]+/g, temp = {};
+
+			if(format.match(reg).join() != str.match(reg).join()) { return null; }
+			else {
+				format = format.split(reg);
+				str = str.split(reg);
+				for (var i = format.length - 1; i >= 0; i--) {
+					temp[format[i]] = str[i];
+				}
+			}
+			return helpers.obj2Epoch(temp, centuryNum);
+		},
+		getDate: function(d, format) {
+			if(!d) { return '--'; }
+			var F = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+				l = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+				dt = new Date(0),
+				out = {};
+			dt.setUTCSeconds(parseInt(d));
+			out.j = dt.getDate();		// 1 to 31
+			out.d = out.j.pad(2);		// 01 to 31
+			out.w = dt.getDay();		// 0 to 6
+			out.l = l[out.w];			// Sunday to Saturday
+			out.D = out.l.substring(0,3);	// Sun to Sat
+			out.n = dt.getMonth();		// 0 to 11
+			out.F = F[out.n];			// January to December
+			out.M = out.F.substring(0,3);	// Jan to Dec
+			out.n += 1;					// 1 to 12
+			out.m = out.n.pad(2);		// 01 to 12
+			out.Y = dt.getFullYear();	// 1970: year number
+			out.y = out.Y % 100;		// 70: year number
+			out.G = dt.getHours();		// 0 to 23
+			out.g = (out.G == 12)? 12 : out.G % 12;			// 0 to 11
+			out.H = out.G.pad(2);		// 00 to 23
+			out.h = out.g.pad(2);		// 01 to 12
+			out.i = dt.getMinutes().pad(2);	// 00 to 59
+			out.s = dt.getSeconds().pad(2);	// 00 to 59
+			out.a = (parseInt(out.G/12) > 0)? 'pm' : 'am';
+			out.A = out.a.toUpperCase();	// AM or PM
+
+			return format.replace(
+				new RegExp(Object.keys(out).join('|'), 'gi'),
+				function(key) {
+					return out[key];
+				}
+			);
+		},
+		obj2Array: function(obj) {
+			var out = [];
+			for(var x in obj) {
+				out.push({key: x, value: obj[x], type: helpers.getType(obj[x])});
+			}
+			return out;
+		}
 	};
 
 	return {
@@ -542,114 +673,6 @@ var Core = function() {
 			el.addClass(className);
 			setTimeout(function() { el.removeClass(className); }, 1000*t);
 		},
-		objectToEpoch: function(obj, centuryNum) {
-			var F = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
-				l = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
-				keys = ['Y', 'n', 'j', 'G', 'i', 's'], out = {}, dt = new Date();
-
-			out.Y = dt.getFullYear();
-			out.n = dt.getMonth();
-			out.j = dt.getDate();
-			out.G = 23;
-			out.i = 59;
-			out.s = 59;
-			/*out.G = dt.getHours();
-			out.i = dt.getMinutes();
-			out.s = dt.getSeconds();*/
-			$.each(obj, function(k, v) {
-				if((k != 'a') && (k != 'A')) { v = parseInt(v); }
-				if(k == 'n') { out.n = v-1; }
-				else if(keys.indexOf(k) != -1) { out[k] = v; }
-				else {
-					switch(k) {
-						case 'd':
-							out.j = v;
-							break;
-						case 'F':
-							var key = F.indexOf(v);
-							if(key != -1) { out.n = key; }
-							break;
-						case 'M':
-							var M = [];
-							for (var i = F.length - 1; i >= 0; i--) { M[i] = F[i]; }
-							var key = M.indexOf(v);
-							if(key != -1) { out.n = key; }
-							break;
-						case 'm':
-							out.n = v-1;
-							break;
-						case 'y':
-							if(!centuryNum) {
-								centuryNum = Math.floor(out.Y/100);
-							}
-							out.Y = centuryNum*100 + v;
-							break;
-						case 'g': case 'h':
-							var pm = (obj.a || obj.A);
-							if(pm != undefined) {
-								out.G = v;
-								if(v < 12 && pm.toLowerCase() == 'pm') { out.G += 12; }
-							}
-							break;
-						case 'H':
-							out.G = v;
-							break;
-						case 'w': case 'l': case 'D':
-							break;
-					}
-				}
-			});
-			return (new Date(out.Y, out.n, out.j, out.G, out.i, out.s)).getTime() / 1000;
-		},
-		parseDate: function(str, format, centuryNum) {
-			if(!str || !format) { return null; }
-			var reg = /[^\w\d]+/g, temp = {};
-
-			if(format.match(reg).join() != str.match(reg).join()) { return null; }
-			else {
-				format = format.split(reg);
-				str = str.split(reg);
-				for (var i = format.length - 1; i >= 0; i--) {
-					temp[format[i]] = str[i];
-				}
-			}
-			return Core.objectToEpoch(temp, centuryNum);
-		},
-		getDate: function(d, format) {
-			if(!d) { return '--'; }
-			var F = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
-				l = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
-				dt = new Date(0),
-				out = {};
-			dt.setUTCSeconds(parseInt(d));
-			out.j = dt.getDate();		// 1 to 31
-			out.d = out.j.pad(2);		// 01 to 31
-			out.w = dt.getDay();		// 0 to 6
-			out.l = l[out.w];			// Sunday to Saturday
-			out.D = out.l.substring(0,3);	// Sun to Sat
-			out.n = dt.getMonth();		// 0 to 11
-			out.F = F[out.n];			// January to December
-			out.M = out.F.substring(0,3);	// Jan to Dec
-			out.n += 1;					// 1 to 12
-			out.m = out.n.pad(2);		// 01 to 12
-			out.Y = dt.getFullYear();	// 1970: year number
-			out.y = out.Y % 100;		// 70: year number
-			out.G = dt.getHours();		// 0 to 23
-			out.g = (out.G == 12)? 12 : out.G % 12;			// 0 to 11
-			out.H = out.G.pad(2);		// 00 to 23
-			out.h = out.g.pad(2);		// 01 to 12
-			out.i = dt.getMinutes().pad(2);	// 00 to 59
-			out.s = dt.getSeconds().pad(2);	// 00 to 59
-			out.a = (parseInt(out.G/12) > 0)? 'pm' : 'am';
-			out.A = out.a.toUpperCase();	// AM or PM
-
-			return format.replace(
-				new RegExp(Object.keys(out).join('|'), 'gi'),
-				function(key) {
-					return out[key];
-				}
-			);
-		},
 		multiCheck: function(incHidden) { multiCheck(incHidden); },
 		wysiwyg: function(selector) { wysiwyg(selector); },
 		dropdown: function() {
@@ -671,10 +694,7 @@ var Core = function() {
 						dropdown.removeClass('active');
 						return false;
 					}
-				}
-				else {
-					hideDD();
-				}
+				} else { hideDD(); }
 			});
 
 			function hideDD() { $('.dropdown').removeClass('active'); }
@@ -702,9 +722,7 @@ var Core = function() {
 			},
 			destroy = false;
 			if(typeof el === 'string') { el = $(el+'.modal'); }
-			else {
-				destroy = true;
-			}
+			else { destroy = true; }
 
 			return {
 				show: function(bindEv) {
@@ -725,7 +743,7 @@ var Core = function() {
 			});
 			toastr.options = {
 				'closeButton': false,
-				'debug': true,
+				'debug': false,
 				'newestOnTop': true,
 				'progressBar': false,
 				'positionClass': 'toast-top-right',
@@ -740,6 +758,7 @@ var Core = function() {
 				'showMethod': 'fadeIn',
 				'hideMethod': 'fadeOut'
 			}
-		}
+		},
+		helpers: helpers
 	};
 }();

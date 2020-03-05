@@ -12,3 +12,9 @@ function codeToTime($str, $t = null) {
 	if(!$t) { $t = time(); }
 	return strtotime('+'.preg_replace(['/m/i','/w/i','/d/i'], ['months ','weeks ','days '], $str), $t);
 }
+
+function xplode($str, $separator = '-') {
+	if(!$str) { return null; }
+	$str = explode('-', $str);
+	return (!isset($str[1]))? $str[0] : $str;
+}

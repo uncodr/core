@@ -57,12 +57,10 @@ class Admin extends UnCodr {
 					$data['js']['fn'] = ['admin.'.$path[1].'()'];
 					if($path[1] == 'users') {
 						$data['js']['files'] = ['config.users'];
-
-						# get all groups
-						$data['groups'] = $this->model->get([
-							'table' => 'groups',
-							'select' => 'groupID, code, name, expiry',
-						]);
+						$data['groups'] = $this->authex->getGroups('*', 'groupID, code, name, expiry', false);
+					}
+					elseif($path[1] == 'groups') {
+						$data['js']['files'] = ['config.groups'];
 					}
 				}
 
@@ -72,12 +70,8 @@ class Admin extends UnCodr {
 					$data['page'] .= 'config/index';
 					$data['js']['fn'] = ['admin.settings()'];
 
-					# get groups with registration enabled
-					$data['groups'] = $this->model->get([
-						'table' => 'groups',
-						'select' => 'code, name',
-						'where' => ['registration' => 1]
-					]);
+					# get active groups (registration enabled, status 1)
+					$data['groups'] = $this->authex->getGroups('*', 'code, name');
 					if(isset($data['groups'][0])) { $data['groups'] = array_column($data['groups'], 'name', 'code'); }
 				}
 				break;

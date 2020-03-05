@@ -56,6 +56,7 @@ code { display: block; margin: 1.3rem 0; padding: 1rem 1.3rem; }
 .code { display: inline-block; margin: 0; padding: .1rem .3rem; }
 .clearfix::before, .clearfix::after, .topbar::after, .wrapper::before, .wrapper::after, .wrapper-fluid::before, .wrapper-fluid::after, .row::before, .row::after, .btn-group::before, .btn-group::after, .panel::before, .panel::after, .styled-radio::before, .styled-radio::after, .nav-tabs::before, .nav-tabs::after, .nav-primary::after, .page-heading::before, .page-heading::after, .app-title::before, .app-title::after, .app-title a::before, .app-title a::after, .list-inline::after, .list-unstyled > li::after, main::after, .dropdown > .trigger::after { content: ""; display: block; clear: both; }
 html, body, .aspect-fx, .img-placeholder, .blocked, .list-inline.group > li > *, .select, .marquee { position: relative; display: block; }
+th.blocked, td.blocked { display: table-cell; }
 .select > *, .select > span::after, .abs-full { position: absolute; top: 0; bottom: 0; left: 0; right: 0; z-index: 0; }
 
 /*______ Tables ______*/
@@ -65,7 +66,7 @@ th.merge-bottom, td.merge-bottom { padding-bottom: 0; }
 th.merge-top, td.merge-top { padding-top: 0; }
 thead th, table.bordered th, table.bordered td, tr.bordered th, tr.bordered td, .border-bottom { border-bottom: .1rem solid rgba(38,50,56,0.06); }
 table.bordered.all th, table.bordered.all td, tr.bordered.all th, tr.bordered.all td { border-right: .1rem solid rgba(38,50,56,0.06); }
-table.bordered.all, table.bordered.all table { border-left: .1rem solid rgba(38,50,56,0.06); border-top: .1rem solid rgba(38,50,56,0.06); }
+table.bordered.all, table.bordered.all table { border-bottom: 0 none; border-left: .1rem solid rgba(38,50,56,0.06); border-top: .1rem solid rgba(38,50,56,0.06); }
 tfoot th, .border-top { border-top: .1rem solid rgba(38,50,56,0.06); }
 table.multi-row th, table.multi-row td { padding: 1rem; vertical-align: baseline; }
 table.hover tr:hover td, table.zebra tbody tr:not(.hidden):nth-child(even) td { background-color: rgba(38,50,56,0.02); }
@@ -91,7 +92,7 @@ input:focus, select:focus, textarea:focus, .select > select:focus + span { borde
 input[type="radio"], input[type="checkbox"], .radio, .checkbox { min-width: 0; width: 1.8rem; height: 1.8rem; }
 .checkbox, .radio { display: inline-block; position: relative; bottom: -.1rem; margin-right: .7rem; color: #fff; line-height: 1; vertical-align: top; }
 .checkbox { width: 3rem; }
-.checkbox > *, .radio > * { display: block; position: absolute; top: 0; left: 0; z-index: 0; width: 100%; height: 100%; border-radius: .9rem; cursor: pointer; }
+.checkbox > *, .checkbox > input, .radio > * { display: block; position: absolute; top: 0; left: 0; z-index: 0; width: 100%; height: 100%; border-radius: .9rem; cursor: pointer; }
 .checkbox > input, .radio > input { margin: 0; z-index: 1; opacity: 0; }
 .checkbox > input + span, .radio > input + span { border: .2rem solid rgba(38,50,56,0.2); text-shadow: .1rem .1rem 0 #fff, -.1rem -.1rem 0 #fff, .1rem -.1rem 0 #fff, -.1rem .1rem 0 #fff; transition: color 200ms, border-color 200ms; }
 .checkbox > input:checked + span, .checkbox > input.part + span, .radio > input:checked + span { color: #1e88e5; border-color: #1e88e5; }
@@ -415,6 +416,7 @@ table .ion.circle { margin: -.5rem 0; }
 .has-hover-tools.invi:hover .hover-tools { display: block; }
 .has-hover-tools .hover-tools { opacity: 0; transition: all 400ms; }
 .has-hover-tools:hover .hover-tools { opacity: 1; }
+.hellip { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 .marker { background-color: #ffeb3b; }
 .hint { font-size: 1.2rem; clear: both; }

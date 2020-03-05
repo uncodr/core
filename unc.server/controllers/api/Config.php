@@ -87,22 +87,32 @@ class Config extends UnCodr {
 			return null;
 		}
 
+		$getParams = $this->input->get();
 		if($userID == 'me') { $userID = $this->session['userID']; }
+		elseif($userID == 'meta') {
+			$params = func_get_args();
+			if(!isset($params[1])) { return null; }
+			$this->_userMeta(xplode($params[1]), isset($getParams['key'])? $getParams['key'] : true);
+			return null;
+		}
 
+		$userID = xplode($userID);
 		switch($this->input->method()) {
 			case 'get':
-				$this->apiResponse = $this->_getUsers($userID);
+				$this->apiResponse = $this->_getUsers($userID, $getParams);
 				break;
 			case 'patch':
-				$this->apiResponse = $this->_patchUsers($userID);
+				$this->apiResponse = $this->_patchUsers($userID, json_decode($this->input->raw_input_stream, true));
 				break;
 			case 'delete':
-				$this->apiResponse = $this->_deleteUsers($userID);
+				$this->apiResponse = $this->_deleteUsers($userID, $getParams);
 				break;
+			default:
+				$this->exitCode = 405;
 		}
 	}
 
-	private function _getUsers($userID = null) {
+	private function _getUsers($userID = null, $getParams = []) {
 
 		# if the user does not have permission to READ other users
 		if(($userID != $this->session['userID']) && !($this->_permission & 1)) {
@@ -111,42 +121,41 @@ class Config extends UnCodr {
 		}
 
 		# get parameters
-		$param = $this->input->get();
-		$search = (isset($param['search']))? $param['search'] : null;
-		$groupID = (isset($param['gid']))? $param['gid'] : null;
-		$getMeta = (isset($param['meta']))? $param['meta'] : null;
-		$offset = apiGetOffset($param);
+		$search = (isset($getParams['search']))? $getParams['search'] : null;
+		$groupID = (isset($getParams['gid']))? $getParams['gid'] : null;
+		$getMeta = (isset($getParams['meta']))? $getParams['meta'] : null;
+		$offset = apiGetOffset($getParams);
 
 		# if userID is passed, then use it while getting users
-		if($userID) { $param['userID'] = $userID; }
+		if($userID) { $getParams['userID'] = $userID; }
 
 		# status sent is: all/active/inactive
-		if(isset($param['status'])) {
-			switch($param['status']) {
+		if(isset($getParams['status'])) {
+			switch($getParams['status']) {
 				case 'active':
-					$param['users.status'] = 1;
+					$getParams['users.status'] = 1;
 					break;
 				case 'inactive':
-					$param['users.status'] = 0;
+					$getParams['users.status'] = 0;
 					break;
 			}
-			unset($param['status']);
+			unset($getParams['status']);
 		}
 
 		# if sort is sent
-		$orderBy = (isset($param['sort']))? apiGetOrderBy($param['sort'], 'users', ['id' => 'userID']): ['users.addedOn' => 'DESC'];
+		$orderBy = (isset($getParams['sort']))? apiGetOrderBy($getParams['sort'], 'users', ['id' => 'userID']): ['users.addedOn' => 'DESC'];
 
 		# if fields are sent, then use it as $select
 		$select = ['fields' => 'users.userID as id, email, login, screenName, users.name, lastLogin, loginCount, emailVerified, users.status, users.addedOn, users.lastUpdatedOn'];
-		if(isset($param['fields'])) { $select = $this->_selectUsersColumns(json_decode($param['fields'], true)); }
+		if(isset($getParams['fields'])) { $select = $this->_selectUsersColumns(json_decode($getParams['fields'], true)); }
 
 		# unset keys which do not correspond to db columns
-		unset($param['meta'], $param['start'], $param['page'], $param['fields'], $param['sort'], $param['gid'], $param['search']);
+		unset($getParams['meta'], $getParams['start'], $getParams['page'], $getParams['fields'], $getParams['sort'], $getParams['gid'], $getParams['search']);
 
 		# prepare parameters array for fetching data
 		$param2 = [
 			'table' => 'users',
-			'where' => $param,
+			'where' => $getParams,
 			'select' => $select['fields'],
 			'order_by' => $orderBy,
 			'limit' => $offset
@@ -192,6 +201,9 @@ class Config extends UnCodr {
 				$groups = $this->_getGroupsByUserIDs($param2, $select['groups']);
 			}
 			$this->exitCode = 200;
+		} else {
+			$this->exitCode = 404;
+			return ['message' => 'User not found'];
 		}
 
 		return compact('meta', 'data', 'groups');
@@ -259,9 +271,8 @@ class Config extends UnCodr {
 		return $groups;
 	}
 
-	private function _patchUsers($userIDs = null) {
+	private function _patchUsers($userIDs = null, $post = []) {
 
-		$post = json_decode($this->input->raw_input_stream, true);
 		if(!$userIDs || !count($post)) {
 			$this->exitCode = 404;
 			return null;
@@ -269,7 +280,7 @@ class Config extends UnCodr {
 
 		$time = time();
 		$myGroups = array_flip(array_column($this->session['userData']['groups'], 'groupID'));
-		$userIDs = explode('-', $userIDs);
+		if(gettype($userIDs) != 'array') { $userIDs = explode('-', $userIDs); }
 		foreach($userIDs as $userID) {
 			$data = ['user' => [], 'unique' => [], 'hasLogin' => false, 'hasScrName' => false, 'group' => null, 'meta' => null];
 			$data = $this->_patchUsersSanitize($post, $data);
@@ -398,22 +409,79 @@ class Config extends UnCodr {
 		return $error;
 	}
 
-	private function _deleteUsers($userIDs) {
+	private function _deleteUsers($userIDs, $getParams = []) {
+
+		if(!$userIDs) {
+			$this->exitCode = 404;
+			return null;
+		}
+
+		if(isset($getParams['meta'])) {
+
+			# if the user does not have permission to MODIFY users
+			if(!($this->_permission & 2)) { $this->exitCode = 403; }
+			else { $this->exitCode = ($this->model->deleteMeta('users', ['userID' => $userIDs]))? 204:404; }
+
+			return null;
+		}
 
 		# if the user does not have permission to DELETE users
 		if(!($this->_permission & 4)) {
 			$this->exitCode = 403;
 			return null;
 		}
-		if(!$userIDs) {
-			$this->exitCode = 404;
-			return null;
-		}
 
-		$userIDs = explode('-', $userIDs);
-		if(!isset($userIDs[1])) { $userIDs = $userIDs[0]; }
 		$this->exitCode = ($this->authex->deleteUser($userIDs))? 204:404;
 
 		$this->runHook('users/delete', [$userIDs]);
+	}
+
+	private function _userMeta($userID, $key = null) {
+
+		$userID = xplode($userID);
+		if(!$userID || !$key) {
+			$this->exitCode = 404;
+			return null;
+		}
+		$method = $this->input->method();
+
+		# if the user does not have permission to READ/UPDATE other users
+		$access = ($method == 'get')? 1:2;
+		if(($userID != $this->session['userID']) && !($this->_permission & $access)) {
+			$this->exitCode = 403;
+			return null;
+		}
+
+		$params = ['userID' => $userID];
+		if($key && ($key !== true)) { $params['key'] = $key; }
+
+		switch($method) {
+			case 'get':
+				$this->apiResponse['data'] = $this->model->getMeta('users', ['where' => $params]);
+				$this->exitCode = count($this->apiResponse['data'])? 200:404;
+				break;
+			case 'put':
+				$params['data'] = json_decode($this->input->raw_input_stream, true);
+				if($this->model->insertMeta('users', $params)) { $this->exitCode = 204; }
+				else {
+					$this->exitCode = 400;
+					$this->apiResponse = ['message' => 'Unable to insert the meta record'];
+				}
+				break;
+			case 'patch':
+				$params['data'] = json_decode($this->input->raw_input_stream, true);
+				if($this->model->updateMeta('users', $params)) { $this->exitCode = 204; }
+				else {
+					$this->exitCode = 400;
+					$this->apiResponse = ['message' => 'Unable to update the meta record'];
+				}
+				break;
+			case 'delete':
+				$this->exitCode = $this->model->deleteMeta('users', $params)? 204:404;
+				break;
+			default:
+				$this->exitCode = 405;
+				break;
+		}
 	}
 }

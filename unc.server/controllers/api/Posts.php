@@ -83,7 +83,7 @@ class Posts extends UnCodr {
 			$this->_putMeta($postID, $meta['put']);
 		}
 		if (isset($meta['patch'][0])) {
-			$this->_patchMeta($postID, $meta['patch']);
+			$this->_updateMeta($postID, $meta['patch']);
 		}
 
 
@@ -190,7 +190,7 @@ class Posts extends UnCodr {
 				$this->apiResponse = $this->_putMeta($postID, json_decode($this->input->raw_input_stream, true));
 				break;
 			case 'post': case 'patch':
-				$this->apiResponse = $this->_patchMeta($postID, json_decode($this->input->raw_input_stream, true));
+				$this->apiResponse = $this->_updateMeta($postID, json_decode($this->input->raw_input_stream, true));
 				break;
 			case 'delete':
 				$this->apiResponse = $this->_deleteMeta($postID, $this->input->get());
@@ -222,16 +222,16 @@ class Posts extends UnCodr {
 		if(!$this->_hasAccessLevel(2)) { return []; }
 
 		if(isset($data['key'], $data['value'])) { $data = [$data]; }
-		$out = $this->model->putMeta('posts', ['postID' => $postID, 'data' => $data]);
+		$out = $this->model->insertMeta('posts', ['postID' => $postID, 'data' => $data]);
 		$this->exitCode = ($out)? 201 : 401;
 	}
 
-	private function _patchMeta($postID, $data) {
+	private function _updateMeta($postID, $data) {
 
 		if(!$this->_hasAccessLevel(2)) { return []; }
 
 		if(isset($data['key'], $data['value'])) { $data = [$data]; }
-		$out = $this->model->patchMeta('posts', ['postID' => $postID, 'data' => $data]);
+		$out = $this->model->updateMeta('posts', ['postID' => $postID, 'data' => $data]);
 		$this->exitCode = ($out)? 204 : 401;
 	}
 

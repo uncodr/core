@@ -117,8 +117,8 @@
 				axnDate = obj.data[i].lastUpdatedOn;
 				obj.data[i].status = 'Last Updated';
 			}
-			obj.data[i].axnDate = Core.getDate(axnDate, 'M d, Y');
-			obj.data[i].axnTime = Core.getDate(axnDate, 'H:i:s');
+			obj.data[i].axnDate = Core.helpers.getDate(axnDate, 'M d, Y');
+			obj.data[i].axnTime = Core.helpers.getDate(axnDate, 'H:i:s');
 			trTemp.addClass(status+' page-'+obj.page);
 			// if comments are disabled, then show lock icon
 			if(obj.data[i].commentStatus == '0') {
@@ -652,14 +652,14 @@
 			el: sections.meta,
 			api: 'posts/meta',
 			keys: [
-				{label: 'Description', value: 'header.description'},
-				{label: 'Keywords', value: 'header.keywords'},
-				{label: 'Author', value: 'header.author'},
-				{label: 'OG: Image', value: 'header.og:image'},
-				{label: 'OG: Title', value: 'header.og:title'},
-				{label: 'OG: URL', value: 'header.og:url'},
-				{label: 'OG: Site Name', value: 'header.og:site_name'},
-				{label: 'OG: Type', value: 'header.og:type'},
+				{label: 'Description', value: 'header.description', type: 'str'},
+				{label: 'Keywords', value: 'header.keywords', type: 'str'},
+				{label: 'Author', value: 'header.author', type: 'str'},
+				{label: 'OG: Image', value: 'header.og:image', type: 'str'},
+				{label: 'OG: Title', value: 'header.og:title', type: 'str'},
+				{label: 'OG: URL', value: 'header.og:url', type: 'str'},
+				{label: 'OG: Site Name', value: 'header.og:site_name', type: 'str'},
+				{label: 'OG: Type', value: 'header.og:type', type: 'str'},
 			]
 		});
 		initPosts();

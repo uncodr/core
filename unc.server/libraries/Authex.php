@@ -365,23 +365,26 @@ class Authex extends Authex_session {
 	public function updateUserMeta($userID, $meta = []) {
 
 		if(!count($meta)) { return null; }
-
-		$metaOld = $this->CI->model->getMeta('users', ['where' => ['userID' => $userID, 'key' => array_keys($meta)]]);
-		$params = ['table' => 'users_meta', 'data' => []];
-		$remove = [];
-
-		foreach($meta as $key => $value) {
-			if(isset($metaOld[$key])) { $remove[] = $key; }
-			$params['data'][] = ['userID' => $userID, 'key' => $key, 'value' => $value];
+		if(isAssoc($meta)) {
+			$keys = array_keys($meta);
+			$isAssoc = true;
+		} elseif(gettype($meta) == 'array') {
+			$keys = array_column($meta, 'key');
+			$isAssoc = false;
 		}
 
-		if(count($remove)) {
-			$params['where'] = ['userID' => $userID];
-			$params['where_in'] = ['key' => $remove];
-			$this->CI->model->delete($params, false);
+		# get old meta data for given userID and keys
+		$metaOld = $this->CI->model->getMeta('users', ['where' => ['userID' => $userID, 'key' => $keys]]);
+		$out = [];
+
+		# update if userID-key combination exists, else insert
+		foreach($meta as $key => $val) {
+			$params = ['data' => ($isAssoc)? [$key => $val] : $val, 'userID' => $userID];
+			$out[$key] = isset($metaOld[$key])? $this->CI->model->updateMeta('users', $params) : $this->CI->model->insertMeta('users', $params);
+			$params = [];
 		}
 
-		return $this->CI->model->insertBatch($params);
+		return $out;
 	}
 
 	/**
@@ -431,7 +434,7 @@ class Authex extends Authex_session {
 
 		if(isset($identifier['code'])) { $param = apiWhereByType($param, ['code' => $identifier['code']]); }
 		elseif(isset($identifier['id'])) { $param = apiWhereByType($param, ['groupID' => $identifier['id']]); }
-		else { return []; }
+		// else { unset($param['where']); }
 
 		return $this->CI->model->get($param);
 	}
@@ -517,7 +520,7 @@ class Authex extends Authex_session {
 		if($out['registration']['enable'] == 0) { return null; }
 		$out = ['code' => $out['registration']['default_group'], 'autologin' => $out['registration']['autologin']];
 		if($getGroupID) {
-			$group = $this->CI->authex->getGroups(['code' => $out['code']], 'groupID, expiry', true);
+			$group = $this->getGroups(['code' => $out['code']], 'groupID, expiry', true);
 			$out = isset($group[0])? array_merge($out, $group[0]) : null;
 		}
 		return $out;

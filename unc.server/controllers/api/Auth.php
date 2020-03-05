@@ -113,7 +113,7 @@ class Auth extends UnCodr {
 
 				# consider only expiry dates, and ignore expiry of default registration group if it has unlimited expiry
 				$isValid = array_column($user['groups'], 'expiry', 'code');
-				if(isset($isValid[$configs['registration']['default_group']])) { unset($isValid[$configs['registration']['default_group']]); }
+				unset($isValid[$configs['registration']['default_group']]);
 
 				if(!count($isValid)) {
 					$this->apiResponse['message'] = 'Access has Expired. Please contact the admin.';

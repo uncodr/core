@@ -104,7 +104,6 @@
 				break;
 		}
 		_axnsUpdated = true;
-		meta.loadConf({_: val});
 	},
 	_searchTitle = function(val) {
 		var searchInput = sections.list.find('input[name="search"]');
@@ -125,20 +124,14 @@
 			fields: JSON.stringify({users:['email','login','screenName','name','lastLogin','loginCount','emailVerified','status','addedOn'],groups:['id','name','expiry','status']}),
 			success: function(r) {
 				_checkPermission(r.meta._);
-				delete r.message;
-				user = r;
 				user.id = id;
+				user.data = r.data;
+				user.meta = r.meta;
+				user.groups = r.groups;
 				_populateUserData();
 				_populateGroups();
-				delete r.meta._;
-				meta.loadConf({id: user.id, data: r.meta});
 				if(isEditing) { $('.edit-user').trigger('click'); }
 				if(isAdding) { $('.group-add').trigger('click'); }
-				_showDiv('edit', 'Edit User #'+id);
-			},
-			error: function(r) {
-				toastr['error'](r.responseJSON.message);
-				window.history.replaceState({status: 'all', page: 1}, '', Core.changeHash('status:all'));
 			},
 			complete: function(r) {
 				Core.unblock(sections.edit);
@@ -174,6 +167,7 @@
 			trTemp.removeClass('hidden template');
 			data.status = (data.status == 1)? 'Active':'Inactive';
 			data.expiry = Core.helpers.getDate(data.expiry, 'M d, Y H:i');
+			console.log(data.id, user.meta._)
 			data.class = ((data.id == '1') && (parseInt(user.meta._) != 7))? 'hidden':'';
 			trTemp.attr('data-num', i);
 			// replace all values in handlebars
@@ -196,7 +190,7 @@
 	},
 	_addUserGroup = function(data, el) {
 		Core.block(el);
-		data.expiry = Core.helpers.parseDate(data.expiry,'d/m/Y');
+		data.expiry = Core.parseDate(data.expiry,'d/m/Y');
 		API.users().patch({
 			id: user.id,
 			group: {add: [data]},
@@ -221,7 +215,7 @@
 	},
 	_patchUserGroup = function(data, el) {
 		var i = parseInt(el.attr('data-num'));
-		data.expiry = Core.helpers.parseDate(data.expiry,'d/m/Y');
+		data.expiry = Core.parseDate(data.expiry,'d/m/Y');
 		if(user.groups[i].expiry == data.expiry) { delete data.expiry; }
 		if(user.groups[i].status == data.status) { delete data.status; }
 		if(typeof data.expiry != 'undefined' || typeof data.status != 'undefined') {
@@ -456,8 +450,9 @@
 				if(!params.status) { params.status = 'all'; }
 				// if editing
 				if(params.id) {
-					// show user edit page, and populate with the data
+					// show post edit form, and populate with the data
 					_editUser(params.id);
+					_showDiv('edit', 'Edit User #'+params.id);
 					break;
 				}
 				if(params.status) {
@@ -490,16 +485,6 @@
 		initUsers();
 		Core.multiCheck();
 		Core.modal('.user-add').events();
-		meta.init({
-			el: '.user-meta',
-			api: 'config/users/meta',
-			keys: [
-				{label: 'Avatar', value: 'avatar', type: 'str'},
-				{label: 'T&C Agree', value: 'tocAgree', type: 'bool'},
-				{label: 'Phone', value: 'phone', type: 'arr'},
-				{label: 'Biodata', value: 'biodata', type: 'str'}
-			]
-		});
 		$('form.register').submit(function() {
 			var data = Core.validateForm($(this));
 			data.success = function() { toastr['success']('User added'); }
